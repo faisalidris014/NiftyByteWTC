@@ -1,0 +1,44 @@
+{
+  "name": "windows-troubleshooting-companion",
+  "version": "1.0.0",
+  "description": "AI-powered troubleshooting companion for Windows users",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "dist": "electron-builder --publish=never"
+  },
+  "keywords": [
+    "electron",
+    "troubleshooting",
+    "ai",
+    "windows",
+    "system-tray"
+  ],
+  "author": "NiftyByte",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.niftybyte.wtc",
+    "productName": "Windows Troubleshooting Companion",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

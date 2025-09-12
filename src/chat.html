@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows Troubleshooting Companion</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+        }
+        
+        .chat-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 400px;
+            color: #333;
+        }
+        
+        .message {
+            margin: 15px 0;
+            padding: 10px 15px;
+            border-radius: 10px;
+            max-width: 70%;
+        }
+        
+        .ai-message {
+            background: #e3f2fd;
+            margin-right: auto;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .user-message {
+            background: #f3e5f5;
+            margin-left: auto;
+            border-right: 4px solid #9c27b0;
+            text-align: right;
+        }
+        
+        .input-area {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .input-area input {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+        }
+        
+        .input-area button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .input-area button:hover {
+            background: #5a67d8;
+        }
+        
+        .quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .quick-action {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .quick-action:hover {
+            background: #f0f0f0;
+        }
+        
+        .status-bar {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Windows Troubleshooting Companion</h1>
+            <p>AI-powered assistance for your IT issues</p>
+        </div>
+        
+        <div class="chat-container" id="chat">
+            <div class="message ai-message">
+                <strong>AI Assistant:</strong> Hello! I'm here to help you troubleshoot IT issues. 
+                What seems to be the problem today?
+            </div>
+        </div>
+        
+        <div class="quick-actions">
+            <div class="quick-action" onclick="sendQuickMessage('Wi-Fi not working')">
+                📶 Wi-Fi Issues
+            </div>
+            <div class="quick-action" onclick="sendQuickMessage('Printer not working')">
+                🖨️ Printer Problems
+            </div>
+            <div class="quick-action" onclick="sendQuickMessage('Lost document')">
+                📄 File Recovery
+            </div>
+            <div class="quick-action" onclick="sendQuickMessage('App not launching')">
+                💻 App Issues
+            </div>
+        </div>
+        
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="Describe your issue..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+        
+        <div class="status-bar" id="status">
+            Ready to help • v<span id="version">1.0.0</span>
+        </div>
+    </div>
+
+    <script>
+        // Get app version from main process
+        async function loadAppVersion() {
+            try {
+                const version = await window.electronAPI.getAppVersion();
+                document.getElementById('version').textContent = version;
+            } catch (error) {
+                console.log('Could not get app version:', error);
+            }
+        }
+        
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (message) {
+                addMessage(message, 'user');
+                input.value = '';
+                
+                // Simulate AI response
+                setTimeout(() => {
+                    simulateAIResponse(message);
+                }, 1000);
+            }
+        }
+        
+        function sendQuickMessage(text) {
+            document.getElementById('messageInput').value = text;
+            sendMessage();
+        }
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+        
+        function addMessage(text, type) {
+            const chat = document.getElementById('chat');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            
+            const prefix = type === 'ai' ? '<strong>AI Assistant:</strong> ' : '<strong>You:</strong> ';
+            messageDiv.innerHTML = prefix + text;
+            
+            chat.appendChild(messageDiv);
+            chat.scrollTop = chat.scrollHeight;
+        }
+        
+        function simulateAIResponse(userMessage) {
+            const responses = {
+                'wifi': "I'll help you with Wi-Fi issues. First, let me check if your Wi-Fi adapter is enabled...",
+                'printer': "Let me help with printer problems. I'll check the print queue and spooler service...",
+                'document': "I can help recover lost documents. Let me search for auto-recovery files...",
+                'app': "For app issues, I can try clearing cache or restarting the application...",
+                'default': "I understand you're experiencing an issue. Let me help troubleshoot this step by step..."
+            };
+            
+            let response = responses.default;
+            const lowerMessage = userMessage.toLowerCase();
+            
+            if (lowerMessage.includes('wifi') || lowerMessage.includes('wi-fi')) {
+                response = responses.wifi;
+            } else if (lowerMessage.includes('printer')) {
+                response = responses.printer;
+            } else if (lowerMessage.includes('document') || lowerMessage.includes('file')) {
+                response = responses.document;
+            } else if (lowerMessage.includes('app') || lowerMessage.includes('application')) {
+                response = responses.app;
+            }
+            
+            addMessage(response, 'ai');
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAppVersion();
+            document.getElementById('messageInput').focus();
+        });
+    </script>
+</body>
+</html>
