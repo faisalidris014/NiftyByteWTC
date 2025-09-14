@@ -104,9 +104,38 @@ ${this.getDangerousCmdletBlockers()}
 
     fs.writeFileSync(policyFile, policyContent);
 
-    // Set environment variables for PowerShell
-    process.env.PSExecutionPolicyPreference = 'Restricted';
-    process.env.PSLanguageMode = this.options.restrictedLanguageMode ? 'RestrictedLanguage' : 'FullLanguage';
+    // Create isolated environment for PowerShell execution
+    // Note: PowerShell environment variables are set through command arguments, not process.env
+    // to prevent parent process environment pollution
+  }
+
+  /**
+   * Create isolated environment for PowerShell execution
+   */
+  private createIsolatedEnvironment(): Record<string, string> {
+    // Start with a minimal safe environment
+    const isolatedEnv: Record<string, string> = {
+      // Essential variables for basic functionality
+      PATH: process.env.PATH || '',
+      TEMP: process.env.TEMP || os.tmpdir(),
+      TMP: process.env.TMP || os.tmpdir(),
+
+      // PowerShell-specific sandbox identification
+      WTC_SANDBOX: 'true',
+      WTC_POWERSHELL_MODE: 'restricted'
+    };
+
+    // Platform-specific essential variables
+    if (process.platform === 'win32') {
+      isolatedEnv.SYSTEMROOT = process.env.SYSTEMROOT || 'C:\\Windows';
+      isolatedEnv.WINDIR = process.env.WINDIR || 'C:\\Windows';
+      isolatedEnv.ComSpec = process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe';
+    } else {
+      isolatedEnv.HOME = process.env.HOME || os.homedir();
+      isolatedEnv.USER = process.env.USER || 'user';
+    }
+
+    return isolatedEnv;
   }
 
   /**
@@ -173,7 +202,7 @@ ${this.getDangerousCmdletBlockers()}
 
       this.process = spawn('powershell.exe', commandArgs, {
         cwd: path.dirname(this.scriptPath),
-        env: process.env,
+        env: this.createIsolatedEnvironment(),
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true
       });

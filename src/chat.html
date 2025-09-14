@@ -204,10 +204,12 @@
             const chat = document.getElementById('chat');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${type}-message`;
-            
-            const prefix = type === 'ai' ? '<strong>AI Assistant:</strong> ' : '<strong>You:</strong> ';
-            messageDiv.innerHTML = prefix + text;
-            
+
+            const prefixElement = document.createElement('strong');
+            prefixElement.textContent = type === 'ai' ? 'AI Assistant: ' : 'You: ';
+            messageDiv.appendChild(prefixElement);
+            messageDiv.appendChild(document.createTextNode(text));
+
             chat.appendChild(messageDiv);
             chat.scrollTop = chat.scrollHeight;
         }

@@ -119,7 +119,7 @@ function handleSkillExecutionRequest(event: IpcMainEvent, request: SkillExecutio
         error: {
           code: IPC_ERROR_CODES.SKILL_EXECUTION_FAILED,
           message: error.message,
-          details: error.stack
+          details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         },
         executionTimeMs: executionTime
       };

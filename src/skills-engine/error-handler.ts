@@ -302,7 +302,7 @@ export class ErrorHandler extends EventEmitter {
       case 'critical':
       case 'error':
         console.error(message);
-        if (errorEvent.context.stackTrace) {
+        if (errorEvent.context.stackTrace && process.env.NODE_ENV === 'development') {
           console.error(errorEvent.context.stackTrace);
         }
         break;

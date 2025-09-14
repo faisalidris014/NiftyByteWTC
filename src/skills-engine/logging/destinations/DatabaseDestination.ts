@@ -62,7 +62,7 @@ export class DatabaseDestination implements LogDestination {
         context: entry.context ? JSON.stringify(entry.context) : null,
         error: entry.error ? JSON.stringify({
           message: entry.error.message,
-          stack: entry.error.stack
+          stack: process.env.NODE_ENV === 'development' ? entry.error.stack : undefined
         }) : null,
         duration_ms: entry.durationMs,
         resource_usage: entry.resourceUsage ? JSON.stringify(entry.resourceUsage) : null,

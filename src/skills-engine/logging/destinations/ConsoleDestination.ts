@@ -36,7 +36,10 @@ export class ConsoleDestination implements LogDestination {
     }
 
     if (entry.error) {
-      message += `\n${color}Error: ${entry.error.stack || entry.error.message}${this.colors.reset}`;
+      const errorMessage = process.env.NODE_ENV === 'development'
+        ? entry.error.stack || entry.error.message
+        : entry.error.message;
+      message += `\n${color}Error: ${errorMessage}${this.colors.reset}`;
     }
 
     const consoleMethod = this.getConsoleMethod(entry.level);

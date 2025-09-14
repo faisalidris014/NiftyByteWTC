@@ -99,6 +99,10 @@ export class SkillSandbox extends EventEmitter {
     network: number;
   }> = [];
 
+  // Cache for WMI queries to avoid excessive calls
+  private wmiCache = new Map<string, { value: any; timestamp: number }>();
+  private readonly WMI_CACHE_TTL = 1000; // 1 second cache TTL
+
   private logManager = getLogManager();
   private executionId: string = '';
 
@@ -564,42 +568,97 @@ export class SkillSandbox extends EventEmitter {
   }
 
   /**
-   * Windows-specific CPU monitoring using WMI or performance counters
+   * Windows-specific CPU monitoring using WMI to monitor actual child process
    */
   private monitorCpuUsageWindows(): void {
     if (!this.process?.pid) return;
 
     try {
-      // For Windows, we can use a more sophisticated approach
-      // This is a simplified implementation - in production, consider:
-      // 1. Using Windows Performance Counters via node-addon-api
-      // 2. WMI queries for process CPU usage
-      // 3. Windows Management API through native modules
+      // Use WMI to get actual child process CPU usage
+      const cpuUsage = this.getProcessCpuUsageWindows(this.process.pid);
 
-      // Placeholder implementation using process.cpuUsage() for the current process
-      // Note: This monitors the Node.js process, not the child process
-      const cpuUsage = process.cpuUsage();
-      const totalCpu = (cpuUsage.user + cpuUsage.system) / 1000; // Convert to milliseconds
-
-      // Calculate percentage based on time elapsed
-      const now = performance.now();
-      const elapsed = now - this.resourceUsage.lastCpuCheck;
-      const cpuPercentage = Math.min(100, (totalCpu / elapsed) * 100);
-
-      this.resourceUsage.cpuPercentage = cpuPercentage;
-      this.resourceUsage.peakCpuPercentage = Math.max(
-        this.resourceUsage.peakCpuPercentage,
-        cpuPercentage
-      );
+      if (cpuUsage !== null) {
+        this.resourceUsage.cpuPercentage = cpuUsage;
+        this.resourceUsage.peakCpuPercentage = Math.max(
+          this.resourceUsage.peakCpuPercentage,
+          cpuUsage
+        );
+      } else {
+        // Fallback to estimation if WMI query fails
+        this.useCpuUsageFallback();
+      }
     } catch (error) {
-      // Fallback to simple estimation if detailed monitoring fails
-      const cpuUsage = Math.random() * 30 + 10; // 10-40% range for realism
-      this.resourceUsage.cpuPercentage = cpuUsage;
-      this.resourceUsage.peakCpuPercentage = Math.max(
-        this.resourceUsage.peakCpuPercentage,
-        cpuUsage
-      );
+      this.logManager.warn('Windows CPU monitoring failed, using fallback', {
+        executionId: this.executionId,
+        error: (error as Error).message,
+        pid: this.process.pid
+      });
+      this.useCpuUsageFallback();
     }
+  }
+
+  /**
+   * Get process CPU usage using WMI query with caching
+   */
+  private getProcessCpuUsageWindows(pid: number): number | null {
+    const cacheKey = `cpu_${pid}`;
+    const cached = this.wmiCache.get(cacheKey);
+
+    // Return cached value if it exists and is fresh
+    if (cached && (Date.now() - cached.timestamp) < this.WMI_CACHE_TTL) {
+      return cached.value;
+    }
+
+    try {
+      // Use PowerShell to query WMI for process CPU usage
+      const wmiQuery = `Get-WmiObject -Query "SELECT PercentProcessorTime FROM Win32_PerfFormattedData_PerfProc_Process WHERE IDProcess = ${pid}" | Select-Object -ExpandProperty PercentProcessorTime`;
+
+      // Execute PowerShell command synchronously
+      const result = this.executePowerShellSync(wmiQuery);
+
+      if (result.success && result.stdout && result.stdout.trim()) {
+        const cpuPercent = parseFloat(result.stdout.trim());
+        const value = isNaN(cpuPercent) ? null : Math.min(100, cpuPercent);
+
+        // Cache the result
+        this.wmiCache.set(cacheKey, { value, timestamp: Date.now() });
+
+        return value;
+      }
+
+      return null;
+    } catch (error) {
+      this.logManager.debug('WMI CPU query failed', {
+        executionId: this.executionId,
+        pid,
+        error: (error as Error).message
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Fallback CPU monitoring when WMI queries fail
+   */
+  private useCpuUsageFallback(): void {
+    // Use process.cpuUsage() as a last resort, but log that we're monitoring parent process
+    const cpuUsage = process.cpuUsage();
+    const totalCpu = (cpuUsage.user + cpuUsage.system) / 1000;
+    const now = performance.now();
+    const elapsed = now - this.resourceUsage.lastCpuCheck;
+    const cpuPercentage = Math.min(100, (totalCpu / elapsed) * 100);
+
+    this.resourceUsage.cpuPercentage = cpuPercentage;
+    this.resourceUsage.peakCpuPercentage = Math.max(
+      this.resourceUsage.peakCpuPercentage,
+      cpuPercentage
+    );
+
+    // Log warning that we're falling back to parent process monitoring
+    this.logManager.warn('Using parent process CPU monitoring fallback', {
+      executionId: this.executionId,
+      pid: this.process?.pid
+    });
   }
 
   /**
@@ -645,23 +704,107 @@ export class SkillSandbox extends EventEmitter {
   }
 
   /**
-   * Windows-specific memory monitoring
+   * Windows-specific memory monitoring using WMI to monitor actual child process
    */
   private monitorMemoryUsageWindows(): void {
     if (!this.process?.pid) return;
 
     try {
-      // For Windows memory monitoring, we can use process.memoryUsage()
-      // This monitors the Node.js process memory, not the child process
-      const memoryUsage = process.memoryUsage();
+      // Use WMI to get actual child process memory usage
+      const memoryBytes = this.getProcessMemoryUsageWindows(this.process.pid);
 
-      // Use RSS (Resident Set Size) as a reasonable approximation
-      // In production, consider using Windows-specific APIs for child process monitoring
-      this.resourceUsage.memoryBytes = memoryUsage.rss;
+      if (memoryBytes !== null) {
+        this.resourceUsage.memoryBytes = memoryBytes;
+      } else {
+        // Fallback to estimation if WMI query fails
+        this.useMemoryUsageFallback();
+      }
     } catch (error) {
-      // Fallback to realistic memory usage estimation
-      const memoryUsage = (20 + Math.random() * 30) * 1024 * 1024; // 20-50MB range
-      this.resourceUsage.memoryBytes = memoryUsage;
+      this.logManager.warn('Windows memory monitoring failed, using fallback', {
+        executionId: this.executionId,
+        error: (error as Error).message,
+        pid: this.process.pid
+      });
+      this.useMemoryUsageFallback();
+    }
+  }
+
+  /**
+   * Get process memory usage using WMI query with caching
+   */
+  private getProcessMemoryUsageWindows(pid: number): number | null {
+    const cacheKey = `memory_${pid}`;
+    const cached = this.wmiCache.get(cacheKey);
+
+    // Return cached value if it exists and is fresh
+    if (cached && (Date.now() - cached.timestamp) < this.WMI_CACHE_TTL) {
+      return cached.value;
+    }
+
+    try {
+      // Use PowerShell to query WMI for process memory usage
+      const wmiQuery = `Get-WmiObject -Query "SELECT WorkingSetPrivate FROM Win32_PerfFormattedData_PerfProc_Process WHERE IDProcess = ${pid}" | Select-Object -ExpandProperty WorkingSetPrivate`;
+
+      // Execute PowerShell command synchronously
+      const result = this.executePowerShellSync(wmiQuery);
+
+      if (result.success && result.stdout && result.stdout.trim()) {
+        const memoryBytes = parseInt(result.stdout.trim(), 10);
+        const value = isNaN(memoryBytes) ? null : memoryBytes;
+
+        // Cache the result
+        this.wmiCache.set(cacheKey, { value, timestamp: Date.now() });
+
+        return value;
+      }
+
+      return null;
+    } catch (error) {
+      this.logManager.debug('WMI memory query failed', {
+        executionId: this.executionId,
+        pid,
+        error: (error as Error).message
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Fallback memory monitoring when WMI queries fail
+   */
+  private useMemoryUsageFallback(): void {
+    // Use process.memoryUsage() as a last resort, but log that we're monitoring parent process
+    const memoryUsage = process.memoryUsage();
+    this.resourceUsage.memoryBytes = memoryUsage.rss;
+
+    // Log warning that we're falling back to parent process monitoring
+    this.logManager.warn('Using parent process memory monitoring fallback', {
+      executionId: this.executionId,
+      pid: this.process?.pid
+    });
+  }
+
+  /**
+   * Execute PowerShell command synchronously with timeout
+   */
+  private executePowerShellSync(command: string, timeoutMs: number = 2000): { success: boolean; stdout: string; stderr: string } {
+    try {
+      const { execSync } = require('child_process');
+
+      // Execute PowerShell command with proper encoding and timeout
+      const stdout = execSync(`powershell.exe -Command "${command}"`, {
+        encoding: 'utf8',
+        timeout: timeoutMs,
+        windowsHide: true
+      });
+
+      return { success: true, stdout, stderr: '' };
+    } catch (error: any) {
+      return {
+        success: false,
+        stdout: error.stdout || '',
+        stderr: error.stderr || error.message
+      };
     }
   }
 
@@ -1222,6 +1365,7 @@ export class SkillSandbox extends EventEmitter {
     this.diskWriteTracker.clear();
     this.networkConnections.clear();
     this.performanceMetrics = [];
+    this.wmiCache.clear();
   }
 
   /**
