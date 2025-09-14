@@ -15,8 +15,8 @@ describe('ITSM Integration API Tests', () => {
     baseUrl: 'https://test-instance.service-now.com',
     credentials: {
       type: 'basic',
-      username: 'testuser',
-      password: 'testpass'
+      username: process.env.TEST_USERNAME || 'testuser',
+      password: process.env.TEST_PASSWORD || 'testpass'
     },
     enabled: true,
     defaultPriority: 'medium',
@@ -36,8 +36,8 @@ describe('ITSM Integration API Tests', () => {
     baseUrl: 'https://test-atlassian.net',
     credentials: {
       type: 'api_token',
-      username: 'test@example.com',
-      apiToken: 'test-token'
+      username: process.env.TEST_JIRA_USERNAME || 'test@example.com',
+      apiToken: process.env.TEST_JIRA_TOKEN || 'test-token'
     },
     enabled: true,
     defaultPriority: 'medium',

@@ -10,8 +10,8 @@ const mockConfig = {
   baseUrl: 'https://test-instance.service-now.com',
   credentials: {
     type: 'basic',
-    username: 'testuser',
-    password: 'testpass'
+    username: process.env.TEST_USERNAME || 'testuser',
+    password: process.env.TEST_PASSWORD || 'testpass'
   },
   enabled: true,
   defaultPriority: 'medium',

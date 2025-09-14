@@ -44,8 +44,8 @@ async function exampleAddConnections() {
     baseUrl: 'https://your-company.service-now.com',
     credentials: {
       type: 'basic',
-      username: 'api_user',
-      password: 'secure_password_123'
+      username: process.env.SERVICENOW_USERNAME || 'api_user',
+      password: process.env.SERVICENOW_PASSWORD || 'secure_password_123'
     },
     enabled: true,
     defaultPriority: 'medium',
@@ -66,8 +66,8 @@ async function exampleAddConnections() {
     baseUrl: 'https://your-company.atlassian.net',
     credentials: {
       type: 'api_token',
-      username: 'admin@company.com',
-      apiToken: 'your-api-token-here'
+      username: process.env.JIRA_USERNAME || 'admin@company.com',
+      apiToken: process.env.JIRA_API_TOKEN || 'your-api-token-here'
     },
     enabled: true,
     defaultPriority: 'medium',
@@ -217,8 +217,8 @@ async function exampleConnectionManagement() {
     baseUrl: 'https://test.service-now.com',
     credentials: {
       type: 'basic',
-      username: 'test',
-      password: 'test'
+      username: process.env.TEST_USERNAME || 'test',
+      password: process.env.TEST_PASSWORD || 'test'
     },
     enabled: true,
     defaultPriority: 'medium',

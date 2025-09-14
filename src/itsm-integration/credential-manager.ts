@@ -29,7 +29,9 @@ export class CredentialManager {
   private keyLength = 32; // 256 bits
 
   constructor(masterKey: string) {
-    this.encryptionKey = this.deriveKey(masterKey);
+    // Derive initial key using a fixed salt for backward compatibility
+    // This will be rotated when encrypting credentials
+    this.encryptionKey = scryptSync(masterKey, Buffer.from('itsm-credential-salt'), this.keyLength);
   }
 
   /**
@@ -162,7 +164,7 @@ export class CredentialManager {
    */
   rotateKey(newMasterKey: string): void {
     // Re-encrypt all credentials with new key
-    const newEncryptionKey = this.deriveKey(newMasterKey);
+    const newEncryptionKey = scryptSync(newMasterKey, Buffer.from('itsm-credential-salt'), this.keyLength);
 
     for (const [connectionId, storedConnection] of Array.from(this.storage.entries())) {
       try {
@@ -266,33 +268,53 @@ export class CredentialManager {
   }
 
   private encryptCredentialsWithKey(credentials: ITSMCredentials, key: Buffer): EncryptedCredential {
-    const iv = randomBytes(16);
-    const salt = randomBytes(16);
+    const iv = randomBytes(12); // 96-bit IV for AES-GCM
+    const salt = randomBytes(16); // Unique salt for each encryption
 
-    // Use a simpler encryption approach without GCM for compatibility
-    const cipher = createCipheriv('aes-256-cbc', key, iv);
+    // Derive encryption key using unique salt
+    const derivedKey = this.deriveKey(key.toString('hex'), salt);
+
+    // Use AES-GCM for authenticated encryption
+    const cipher = createCipheriv('aes-256-gcm', derivedKey, iv);
 
     const encrypted = Buffer.concat([
       cipher.update(JSON.stringify(credentials), 'utf8'),
       cipher.final()
     ]);
 
+    const authTag = cipher.getAuthTag();
+
     return {
       encryptedData: encrypted.toString('base64'),
       iv: iv.toString('base64'),
       salt: salt.toString('base64'),
-      authTag: '', // Not used with CBC mode
-      algorithm: 'aes-256-cbc',
-      version: '1.0.0'
+      authTag: authTag.toString('base64'),
+      algorithm: 'aes-256-gcm',
+      version: '2.0.0' // Version bump for new encryption format
     };
   }
 
   private decryptCredentials(encryptedCredential: EncryptedCredential): ITSMCredentials {
     const iv = Buffer.from(encryptedCredential.iv, 'base64');
     const encryptedData = Buffer.from(encryptedCredential.encryptedData, 'base64');
+    const salt = Buffer.from(encryptedCredential.salt, 'base64');
+    const authTag = Buffer.from(encryptedCredential.authTag, 'base64');
 
-    // Use a simpler decryption approach without GCM for compatibility
-    const decipher = createDecipheriv('aes-256-cbc', this.encryptionKey, iv);
+    // Handle backward compatibility with v1.0.0 format
+    if (encryptedCredential.version === '1.0.0' || encryptedCredential.algorithm === 'aes-256-cbc') {
+      // Legacy CBC mode decryption
+      const decipher = createDecipheriv('aes-256-cbc', this.encryptionKey, iv);
+      const decrypted = Buffer.concat([
+        decipher.update(encryptedData),
+        decipher.final()
+      ]);
+      return JSON.parse(decrypted.toString('utf8'));
+    }
+
+    // AES-GCM mode decryption
+    const derivedKey = this.deriveKey(this.encryptionKey.toString('hex'), salt);
+    const decipher = createDecipheriv('aes-256-gcm', derivedKey, iv);
+    decipher.setAuthTag(authTag);
 
     const decrypted = Buffer.concat([
       decipher.update(encryptedData),
@@ -302,8 +324,8 @@ export class CredentialManager {
     return JSON.parse(decrypted.toString('utf8'));
   }
 
-  private deriveKey(masterKey: string): Buffer {
-    return scryptSync(masterKey, 'itsm-credential-salt', this.keyLength);
+  private deriveKey(masterKey: string, salt: Buffer): Buffer {
+    return scryptSync(masterKey, salt, this.keyLength);
   }
 
   private generateConnectionId(): string {

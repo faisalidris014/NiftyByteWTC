@@ -80,21 +80,22 @@ export class EncryptedDatabase {
   public encryptData(data: any): EncryptionResult {
     try {
       const jsonData = JSON.stringify(data);
-      const iv = randomBytes(16);
+      const iv = randomBytes(12); // 96-bit IV for AES-GCM
 
       // Use SHA-256 to derive a consistent 32-byte key from the encryption key
       const crypto = require('crypto');
       const key = crypto.createHash('sha256').update(this.config.encryptionKey).digest();
 
-      const cipher = createCipheriv('aes-256-cbc', key, iv);
+      const cipher = createCipheriv('aes-256-gcm', key, iv);
       let encrypted = cipher.update(jsonData, 'utf8', 'base64');
       encrypted += cipher.final('base64');
 
+      const authTag = cipher.getAuthTag();
 
       return {
         encrypted,
         iv: iv.toString('hex'),
-        authTag: '' // Not used in CBC mode
+        authTag: authTag.toString('hex') // Authentication tag for GCM mode
       };
     } catch (error) {
       throw new Error(`${QUEUE_ERROR_CODES.ENCRYPTION_ERROR}: ${(error as Error).message}`);
@@ -103,12 +104,23 @@ export class EncryptedDatabase {
 
   public decryptData(encrypted: string, iv: string, authTag: string): any {
     try {
-
       const ivBuffer = Buffer.from(iv, 'hex');
       const crypto = require('crypto');
       const key = crypto.createHash('sha256').update(this.config.encryptionKey).digest();
 
-      const decipher = createDecipheriv('aes-256-cbc', key, ivBuffer);
+      // Handle backward compatibility - if authTag is empty, use CBC mode
+      if (!authTag) {
+        const decipher = createDecipheriv('aes-256-cbc', key, ivBuffer);
+        let decrypted = decipher.update(encrypted, 'base64', 'utf8');
+        decrypted += decipher.final('utf8');
+        return JSON.parse(decrypted);
+      }
+
+      // AES-GCM mode with authentication
+      const authTagBuffer = Buffer.from(authTag, 'hex');
+      const decipher = createDecipheriv('aes-256-gcm', key, ivBuffer);
+      decipher.setAuthTag(authTagBuffer);
+
       let decrypted = decipher.update(encrypted, 'base64', 'utf8');
       decrypted += decipher.final('utf8');
 
