@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } from 'electron';
 import * as path from 'path';
 import { initializeIPCHandlers, registerSkill } from '../ipc/mainHandlers';
+import { initializeAuthHandlers, cleanupAuthHandlers } from '../ipc/adminAuthHandlers';
 
 const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_IS_DEV === 'true';
 
@@ -224,6 +225,9 @@ app.whenReady().then(() => {
   // Initialize IPC handlers
   initializeIPCHandlers();
 
+  // Initialize authentication handlers
+  initializeAuthHandlers();
+
   // Register sample skills
   registerSampleSkills();
 
@@ -258,7 +262,8 @@ ipcMain.handle('get-app-version', () => {
 
 // Clean up on exit
 app.on('will-quit', (event) => {
-  // Additional cleanup if needed
+  // Cleanup authentication handlers
+  cleanupAuthHandlers();
   console.log('Application quitting...');
 });
 
