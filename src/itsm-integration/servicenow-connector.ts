@@ -7,6 +7,7 @@ import {
   ServiceNowTicket,
   ITSM_ERROR_CODES
 } from './types';
+import { secureHttpClient } from '../utils/secure-http-client';
 
 interface ServiceNowIncident {
   short_description: string;
@@ -121,19 +122,18 @@ export class ServiceNowConnector extends BaseITSMCConnector {
     const startTime = Date.now();
 
     try {
-      const response = await fetch(`${this.apiUrl}?sysparm_limit=1`, {
-        method: 'GET',
+      const response = await secureHttpClient.get(`${this.apiUrl}?sysparm_limit=1`, {
         headers: {
           'Authorization': this.authHeader,
           'Accept': 'application/json',
           'Content-Type': 'application/json'
         },
-        signal: AbortSignal.timeout(this.options.timeoutMs!)
+        timeoutMs: this.options.timeoutMs
       });
 
       const responseTime = Date.now() - startTime;
 
-      if (!response.ok) {
+      if (response.status >= 400) {
         return {
           success: false,
           message: `ServiceNow API returned status ${response.status}: ${response.statusText}`,
@@ -164,24 +164,21 @@ export class ServiceNowConnector extends BaseITSMCConnector {
   }
 
   private async createServiceNowIncident(incident: ServiceNowIncident): Promise<any> {
-    const response = await fetch(this.apiUrl, {
-      method: 'POST',
+    const response = await secureHttpClient.post(this.apiUrl, incident, {
       headers: {
         'Authorization': this.authHeader,
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(incident),
-      signal: AbortSignal.timeout(this.options.timeoutMs!)
+      timeoutMs: this.options.timeoutMs
     });
 
-    if (!response.ok) {
-      const errorData = await response.text();
+    if (response.status >= 400) {
+      const errorData = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
       throw new Error(`ServiceNow API error: ${response.status} ${response.statusText} - ${errorData}`);
     }
 
-    const result: ServiceNowResponse = await response.json();
-    return result.result;
+    return response.data.result;
   }
 
   private mapToServiceNowFormat(ticketData: StandardizedTicketPayload): ServiceNowIncident {

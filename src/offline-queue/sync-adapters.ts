@@ -1,4 +1,5 @@
 import { TicketQueueItem, FeedbackQueueItem, QUEUE_ERROR_CODES } from './types';
+import { secureHttpClient } from '../utils/secure-http-client';
 
 export interface SyncAdapter {
   syncTicket(ticket: TicketQueueItem): Promise<void>;
@@ -41,21 +42,18 @@ export class ServiceNowAdapter implements SyncAdapter {
   async syncTicket(ticket: TicketQueueItem): Promise<void> {
     const url = `https://${this.config.instance}.service-now.com/api/now/${this.config.apiVersion || 'v1'}/table/${this.config.tableName || 'incident'}`;
 
-    const response = await fetch(url, {
-      method: 'POST',
+    const response = await secureHttpClient.post(url, this.mapTicketToServiceNow(ticket), {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Basic ' + Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')
-      },
-      body: JSON.stringify(this.mapTicketToServiceNow(ticket))
+      }
     });
 
-    if (!response.ok) {
+    if (response.status >= 400) {
       throw new Error(`${QUEUE_ERROR_CODES.SYNC_FAILED}: ServiceNow API error: ${response.status} ${response.statusText}`);
     }
 
-    const result = await response.json();
-    if (!result.result || !result.result.sys_id) {
+    if (!response.data.result || !response.data.result.sys_id) {
       throw new Error(`${QUEUE_ERROR_CODES.SYNC_FAILED}: ServiceNow response invalid`);
     }
   }
@@ -64,16 +62,14 @@ export class ServiceNowAdapter implements SyncAdapter {
     // ServiceNow doesn't have a standard feedback API, so we'll create a ticket
     const url = `https://${this.config.instance}.service-now.com/api/now/${this.config.apiVersion || 'v1'}/table/incident`;
 
-    const response = await fetch(url, {
-      method: 'POST',
+    const response = await secureHttpClient.post(url, this.mapFeedbackToServiceNow(feedback), {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Basic ' + Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')
-      },
-      body: JSON.stringify(this.mapFeedbackToServiceNow(feedback))
+      }
     });
 
-    if (!response.ok) {
+    if (response.status >= 400) {
       throw new Error(`${QUEUE_ERROR_CODES.SYNC_FAILED}: ServiceNow feedback API error: ${response.status} ${response.statusText}`);
     }
   }
@@ -81,13 +77,13 @@ export class ServiceNowAdapter implements SyncAdapter {
   async testConnection(): Promise<boolean> {
     try {
       const url = `https://${this.config.instance}.service-now.com/api/now/${this.config.apiVersion || 'v1'}/table/sys_user?sysparm_limit=1`;
-      const response = await fetch(url, {
+      const response = await secureHttpClient.get(url, {
         headers: {
           'Authorization': 'Basic ' + Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64')
         }
       });
 
-      return response.ok;
+      return response.status < 400;
     } catch {
       return false;
     }
@@ -148,21 +144,18 @@ export class JiraAdapter implements SyncAdapter {
   async syncTicket(ticket: TicketQueueItem): Promise<void> {
     const url = `${this.config.baseUrl}/rest/api/3/issue`;
 
-    const response = await fetch(url, {
-      method: 'POST',
+    const response = await secureHttpClient.post(url, this.mapTicketToJira(ticket), {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Basic ' + Buffer.from(`${this.config.username}:${this.config.apiToken}`).toString('base64')
-      },
-      body: JSON.stringify(this.mapTicketToJira(ticket))
+      }
     });
 
-    if (!response.ok) {
+    if (response.status >= 400) {
       throw new Error(`${QUEUE_ERROR_CODES.SYNC_FAILED}: Jira API error: ${response.status} ${response.statusText}`);
     }
 
-    const result = await response.json();
-    if (!result.key) {
+    if (!response.data.key) {
       throw new Error(`${QUEUE_ERROR_CODES.SYNC_FAILED}: Jira response invalid`);
     }
   }
@@ -171,16 +164,14 @@ export class JiraAdapter implements SyncAdapter {
     // Jira doesn't have a standard feedback API, so we'll create an issue
     const url = `${this.config.baseUrl}/rest/api/3/issue`;
 
-    const response = await fetch(url, {
-      method: 'POST',
+    const response = await secureHttpClient.post(url, this.mapFeedbackToJira(feedback), {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Basic ' + Buffer.from(`${this.config.username}:${this.config.apiToken}`).toString('base64')
-      },
-      body: JSON.stringify(this.mapFeedbackToJira(feedback))
+      }
     });
 
-    if (!response.ok) {
+    if (response.status >= 400) {
       throw new Error(`${QUEUE_ERROR_CODES.SYNC_FAILED}: Jira feedback API error: ${response.status} ${response.statusText}`);
     }
   }
@@ -188,13 +179,13 @@ export class JiraAdapter implements SyncAdapter {
   async testConnection(): Promise<boolean> {
     try {
       const url = `${this.config.baseUrl}/rest/api/3/myself`;
-      const response = await fetch(url, {
+      const response = await secureHttpClient.get(url, {
         headers: {
           'Authorization': 'Basic ' + Buffer.from(`${this.config.username}:${this.config.apiToken}`).toString('base64')
         }
       });
 
-      return response.ok;
+      return response.status < 400;
     } catch {
       return false;
     }
@@ -299,23 +290,20 @@ export class ZendeskAdapter implements SyncAdapter {
   async syncTicket(ticket: TicketQueueItem): Promise<void> {
     const url = `https://${this.config.subdomain}.zendesk.com/api/v2/tickets.json`;
 
-    const response = await fetch(url, {
-      method: 'POST',
+    const response = await secureHttpClient.post(url, {
+      ticket: this.mapTicketToZendesk(ticket)
+    }, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Basic ' + Buffer.from(`${this.config.email}/token:${this.config.apiToken}`).toString('base64')
-      },
-      body: JSON.stringify({
-        ticket: this.mapTicketToZendesk(ticket)
-      })
+      }
     });
 
-    if (!response.ok) {
+    if (response.status >= 400) {
       throw new Error(`${QUEUE_ERROR_CODES.SYNC_FAILED}: Zendesk API error: ${response.status} ${response.statusText}`);
     }
 
-    const result = await response.json();
-    if (!result.ticket || !result.ticket.id) {
+    if (!response.data.ticket || !response.data.ticket.id) {
       throw new Error(`${QUEUE_ERROR_CODES.SYNC_FAILED}: Zendesk response invalid`);
     }
   }
@@ -324,18 +312,16 @@ export class ZendeskAdapter implements SyncAdapter {
     // Zendesk doesn't have a separate feedback API, create a ticket
     const url = `https://${this.config.subdomain}.zendesk.com/api/v2/tickets.json`;
 
-    const response = await fetch(url, {
-      method: 'POST',
+    const response = await secureHttpClient.post(url, {
+      ticket: this.mapFeedbackToZendesk(feedback)
+    }, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Basic ' + Buffer.from(`${this.config.email}/token:${this.config.apiToken}`).toString('base64')
-      },
-      body: JSON.stringify({
-        ticket: this.mapFeedbackToZendesk(feedback)
-      })
+      }
     });
 
-    if (!response.ok) {
+    if (response.status >= 400) {
       throw new Error(`${QUEUE_ERROR_CODES.SYNC_FAILED}: Zendesk feedback API error: ${response.status} ${response.statusText}`);
     }
   }
@@ -343,13 +329,13 @@ export class ZendeskAdapter implements SyncAdapter {
   async testConnection(): Promise<boolean> {
     try {
       const url = `https://${this.config.subdomain}.zendesk.com/api/v2/users/me.json`;
-      const response = await fetch(url, {
+      const response = await secureHttpClient.get(url, {
         headers: {
           'Authorization': 'Basic ' + Buffer.from(`${this.config.email}/token:${this.config.apiToken}`).toString('base64')
         }
       });
 
-      return response.ok;
+      return response.status < 400;
     } catch {
       return false;
     }
@@ -414,21 +400,18 @@ export class SalesforceAdapter implements SyncAdapter {
   async syncTicket(ticket: TicketQueueItem): Promise<void> {
     const url = `${this.config.instanceUrl}/services/data/v58.0/sobjects/${this.config.objectName || 'Case'}/`;
 
-    const response = await fetch(url, {
-      method: 'POST',
+    const response = await secureHttpClient.post(url, this.mapTicketToSalesforce(ticket), {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${this.config.accessToken}`
-      },
-      body: JSON.stringify(this.mapTicketToSalesforce(ticket))
+      }
     });
 
-    if (!response.ok) {
+    if (response.status >= 400) {
       throw new Error(`${QUEUE_ERROR_CODES.SYNC_FAILED}: Salesforce API error: ${response.status} ${response.statusText}`);
     }
 
-    const result = await response.json();
-    if (!result.id) {
+    if (!response.data.id) {
       throw new Error(`${QUEUE_ERROR_CODES.SYNC_FAILED}: Salesforce response invalid`);
     }
   }
@@ -437,16 +420,14 @@ export class SalesforceAdapter implements SyncAdapter {
     // Salesforce doesn't have a standard feedback object, use Case
     const url = `${this.config.instanceUrl}/services/data/v58.0/sobjects/Case/`;
 
-    const response = await fetch(url, {
-      method: 'POST',
+    const response = await secureHttpClient.post(url, this.mapFeedbackToSalesforce(feedback), {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${this.config.accessToken}`
-      },
-      body: JSON.stringify(this.mapFeedbackToSalesforce(feedback))
+      }
     });
 
-    if (!response.ok) {
+    if (response.status >= 400) {
       throw new Error(`${QUEUE_ERROR_CODES.SYNC_FAILED}: Salesforce feedback API error: ${response.status} ${response.statusText}`);
     }
   }
@@ -454,13 +435,13 @@ export class SalesforceAdapter implements SyncAdapter {
   async testConnection(): Promise<boolean> {
     try {
       const url = `${this.config.instanceUrl}/services/data/v58.0/query?q=SELECT+Id+FROM+Case+LIMIT+1`;
-      const response = await fetch(url, {
+      const response = await secureHttpClient.get(url, {
         headers: {
           'Authorization': `Bearer ${this.config.accessToken}`
         }
       });
 
-      return response.ok;
+      return response.status < 400;
     } catch {
       return false;
     }

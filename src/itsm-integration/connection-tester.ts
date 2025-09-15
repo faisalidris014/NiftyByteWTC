@@ -1,6 +1,7 @@
 import { ITSMConnectionConfig, ConnectionTestResult, ITSM_ERROR_CODES } from './types';
 import { ServiceNowConnector } from './servicenow-connector';
 import { JiraConnector } from './jira-connector';
+import { secureHttpClient } from '../utils/secure-http-client';
 
 export class ConnectionTester {
   /**
@@ -228,14 +229,14 @@ export class ConnectionTester {
       const parsedUrl = new URL(url);
       const testUrl = `${parsedUrl.origin}/`;
 
-      const response = await fetch(testUrl, {
+      const response = await secureHttpClient.get(testUrl, {
         method: 'HEAD',
-        signal: AbortSignal.timeout(10000)
+        timeoutMs: 10000
       });
 
       const durationMs = Date.now() - startTime;
 
-      if (response.ok) {
+      if (response.status < 400) {
         return {
           success: true,
           message: 'Basic connectivity test passed',
@@ -312,18 +313,17 @@ export class ConnectionTester {
     const authHeader = 'Basic ' + Buffer.from(`${config.credentials.username}:${config.credentials.password}`).toString('base64');
 
     try {
-      const response = await fetch(`${config.baseUrl}/api/now/table/sys_user?sysparm_limit=1`, {
-        method: 'GET',
+      const response = await secureHttpClient.get(`${config.baseUrl}/api/now/table/sys_user?sysparm_limit=1`, {
         headers: {
           'Authorization': authHeader,
           'Accept': 'application/json'
         },
-        signal: AbortSignal.timeout(15000)
+        timeoutMs: 15000
       });
 
       const durationMs = Date.now() - startTime;
 
-      if (response.ok) {
+      if (response.status < 400) {
         return {
           success: true,
           message: 'ServiceNow API access test passed',
@@ -377,18 +377,17 @@ export class ConnectionTester {
     const authHeader = 'Basic ' + Buffer.from(`${config.credentials.username}:${config.credentials.apiToken}`).toString('base64');
 
     try {
-      const response = await fetch(`${config.baseUrl}/rest/api/2/myself`, {
-        method: 'GET',
+      const response = await secureHttpClient.get(`${config.baseUrl}/rest/api/2/myself`, {
         headers: {
           'Authorization': authHeader,
           'Accept': 'application/json'
         },
-        signal: AbortSignal.timeout(15000)
+        timeoutMs: 15000
       });
 
       const durationMs = Date.now() - startTime;
 
-      if (response.ok) {
+      if (response.status < 400) {
         return {
           success: true,
           message: 'Jira API access test passed',

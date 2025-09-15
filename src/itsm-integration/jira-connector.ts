@@ -7,6 +7,7 @@ import {
   JiraTicket,
   ITSM_ERROR_CODES
 } from './types';
+import { secureHttpClient } from '../utils/secure-http-client';
 
 interface JiraIssue {
   fields: {
@@ -158,19 +159,18 @@ export class JiraConnector extends BaseITSMCConnector {
 
     try {
       // Test by fetching server info
-      const response = await fetch(`${this.config.baseUrl}/rest/api/2/serverInfo`, {
-        method: 'GET',
+      const response = await secureHttpClient.get(`${this.config.baseUrl}/rest/api/2/serverInfo`, {
         headers: {
           'Authorization': this.authHeader,
           'Accept': 'application/json',
           'Content-Type': 'application/json'
         },
-        signal: AbortSignal.timeout(this.options.timeoutMs!)
+        timeoutMs: this.options.timeoutMs
       });
 
       const responseTime = Date.now() - startTime;
 
-      if (!response.ok) {
+      if (response.status >= 400) {
         return {
           success: false,
           message: `Jira API returned status ${response.status}: ${response.statusText}`,
@@ -183,7 +183,7 @@ export class JiraConnector extends BaseITSMCConnector {
         };
       }
 
-      const serverInfo = await response.json();
+      const serverInfo = response.data;
       return {
         success: true,
         message: `Jira connection successful (Version: ${serverInfo.version})`,
@@ -202,37 +202,34 @@ export class JiraConnector extends BaseITSMCConnector {
   }
 
   private async createJiraIssue(issue: JiraIssue): Promise<JiraResponse> {
-    const response = await fetch(this.apiUrl, {
-      method: 'POST',
+    const response = await secureHttpClient.post(this.apiUrl, issue, {
       headers: {
         'Authorization': this.authHeader,
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(issue),
-      signal: AbortSignal.timeout(this.options.timeoutMs!)
+      timeoutMs: this.options.timeoutMs
     });
 
-    if (!response.ok) {
-      const errorData = await response.text();
+    if (response.status >= 400) {
+      const errorData = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
       throw new Error(`Jira API error: ${response.status} ${response.statusText} - ${errorData}`);
     }
 
-    return await response.json();
+    return response.data;
   }
 
   private async validateProject(projectKey: string): Promise<boolean> {
     try {
-      const response = await fetch(`${this.config.baseUrl}/rest/api/2/project/${projectKey}`, {
-        method: 'GET',
+      const response = await secureHttpClient.get(`${this.config.baseUrl}/rest/api/2/project/${projectKey}`, {
         headers: {
           'Authorization': this.authHeader,
           'Accept': 'application/json'
         },
-        signal: AbortSignal.timeout(10000)
+        timeoutMs: 10000
       });
 
-      return response.ok;
+      return response.status < 400;
     } catch {
       return false;
     }

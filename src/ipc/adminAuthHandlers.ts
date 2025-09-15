@@ -115,7 +115,8 @@ async function ensureAuthConfig(): Promise<void> {
   try {
     await fs.access(CONFIG_DIR);
   } catch {
-    await fs.mkdir(CONFIG_DIR, { recursive: true });
+    await fs.mkdir(CONFIG_DIR, { recursive: true, mode: 0o700 });
+    await fs.chmod(CONFIG_DIR, 0o700); // Restrictive permissions
   }
 
   try {
@@ -130,7 +131,10 @@ async function ensureAuthConfig(): Promise<void> {
       }))
     };
 
-    await fs.writeFile(AUTH_CONFIG_FILE, JSON.stringify(defaultConfig, null, 2), 'utf8');
+    await fs.writeFile(AUTH_CONFIG_FILE, JSON.stringify(defaultConfig, null, 2), {
+      encoding: 'utf8',
+      mode: 0o600 // Read/write for owner only
+    });
     console.warn('Default admin authentication configuration created. Please change default passwords!');
   }
 }
@@ -303,7 +307,10 @@ async function updateUserPassword(username: string, newPassword: string): Promis
 
   config.users[userIndex].passwordHash = hashPassword(newPassword);
 
-  await fs.writeFile(AUTH_CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
+  await fs.writeFile(AUTH_CONFIG_FILE, JSON.stringify(config, null, 2), {
+    encoding: 'utf8',
+    mode: 0o600 // Read/write for owner only
+  });
 }
 
 /**
