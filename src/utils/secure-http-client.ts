@@ -378,14 +378,24 @@ export class SecureHttpClient {
   /**
    * GET request with TLS 1.3 enforcement
    */
-  async get<T = any>(url: string, options?: RequestInit): Promise<SecureHttpResponse<T>> {
+  async get<T = any>(url: string, options?: RequestInit & {
+    timeoutMs?: number;
+    maxRedirects?: number;
+    followRedirects?: boolean;
+    validateSsl?: boolean;
+  }): Promise<SecureHttpResponse<T>> {
     return this.request<T>(url, { ...options, method: 'GET' });
   }
 
   /**
    * POST request with TLS 1.3 enforcement
    */
-  async post<T = any>(url: string, data?: any, options?: RequestInit): Promise<SecureHttpResponse<T>> {
+  async post<T = any>(url: string, data?: any, options?: RequestInit & {
+    timeoutMs?: number;
+    maxRedirects?: number;
+    followRedirects?: boolean;
+    validateSsl?: boolean;
+  }): Promise<SecureHttpResponse<T>> {
     return this.request<T>(url, {
       ...options,
       method: 'POST',
@@ -400,7 +410,12 @@ export class SecureHttpClient {
   /**
    * PUT request with TLS 1.3 enforcement
    */
-  async put<T = any>(url: string, data?: any, options?: RequestInit): Promise<SecureHttpResponse<T>> {
+  async put<T = any>(url: string, data?: any, options?: RequestInit & {
+    timeoutMs?: number;
+    maxRedirects?: number;
+    followRedirects?: boolean;
+    validateSsl?: boolean;
+  }): Promise<SecureHttpResponse<T>> {
     return this.request<T>(url, {
       ...options,
       method: 'PUT',
@@ -415,7 +430,12 @@ export class SecureHttpClient {
   /**
    * DELETE request with TLS 1.3 enforcement
    */
-  async delete<T = any>(url: string, options?: RequestInit): Promise<SecureHttpResponse<T>> {
+  async delete<T = any>(url: string, options?: RequestInit & {
+    timeoutMs?: number;
+    maxRedirects?: number;
+    followRedirects?: boolean;
+    validateSsl?: boolean;
+  }): Promise<SecureHttpResponse<T>> {
     return this.request<T>(url, { ...options, method: 'DELETE' });
   }
 

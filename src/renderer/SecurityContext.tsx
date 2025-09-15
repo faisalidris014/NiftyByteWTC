@@ -6,7 +6,7 @@ interface User {
   id: string;
   username: string;
   role: 'admin' | 'operator' | 'viewer';
-  permissions: string[];
+  permissions: readonly string[];
 }
 
 interface AuthState {

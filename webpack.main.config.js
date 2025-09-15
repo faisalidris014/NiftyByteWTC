@@ -3,7 +3,7 @@ const nodeExternals = require('webpack-node-externals');
 
 module.exports = {
   mode: 'production',
-  entry: './src/main/main.ts',
+  entry: './src/main/index.ts',
   target: 'electron-main',
   externals: [nodeExternals()],
   module: {

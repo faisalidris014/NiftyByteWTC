@@ -32,8 +32,8 @@ declare global {
         user?: {
           id: string;
           username: string;
-          role: string;
-          permissions: string[];
+          role: 'admin' | 'operator' | 'viewer';
+          permissions: readonly string[];
         };
         error?: string;
         sessionToken?: string;
@@ -44,8 +44,8 @@ declare global {
         user?: {
           id: string;
           username: string;
-          role: string;
-          permissions: string[];
+          role: 'admin' | 'operator' | 'viewer';
+          permissions: readonly string[];
         };
       }>;
 

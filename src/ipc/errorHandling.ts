@@ -108,8 +108,8 @@ export class IPCError extends Error {
     const retryableCodes = [
       IPC_ERROR_CODES.TIMEOUT,
       IPC_ERROR_CODES.CONNECTION_LOST
-    ];
-    
+    ] as string[];
+
     return retryableCodes.includes(this.code) && this.severity !== 'fatal';
   }
 

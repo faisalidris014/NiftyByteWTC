@@ -11,7 +11,8 @@ interface AdminUser {
   id: string;
   username: string;
   role: 'admin' | 'operator' | 'viewer';
-  permissions: string[];
+  permissions: readonly string[];
+  passwordHash?: string;
 }
 
 interface AuthResult {
@@ -24,11 +25,16 @@ interface AuthResult {
 interface SessionData {
   userId: string;
   username: string;
-  role: string;
-  permissions: string[];
+  role: 'admin' | 'operator' | 'viewer';
+  permissions: readonly string[];
   createdAt: number;
   expiresAt: number;
   lastActivity: number;
+}
+
+// Authentication configuration interface
+interface AuthConfig {
+  users: AdminUser[];
 }
 
 // Permission definitions
@@ -159,7 +165,7 @@ function registerAuthHandlers(): void {
   // Session validation
   ipcMain.handle('check-admin-session', async (event): Promise<{ valid: boolean; user?: AdminUser }> => {
     try {
-      const sessionToken = event.sender.getWebContents().id.toString();
+      const sessionToken = event.sender.id.toString();
       const sessionData = activeSessions.get(sessionToken);
 
       if (!sessionData || sessionData.expiresAt < Date.now()) {
@@ -175,7 +181,7 @@ function registerAuthHandlers(): void {
         user: {
           id: sessionData.userId,
           username: sessionData.username,
-          role: sessionData.role as any,
+          role: sessionData.role,
           permissions: sessionData.permissions
         }
       };
@@ -188,7 +194,7 @@ function registerAuthHandlers(): void {
   // Logout
   ipcMain.handle('logout-admin', async (event): Promise<void> => {
     try {
-      const sessionToken = event.sender.getWebContents().id.toString();
+      const sessionToken = event.sender.id.toString();
       activeSessions.delete(sessionToken);
     } catch (error) {
       console.error('Logout error:', error);
@@ -227,7 +233,7 @@ function registerAuthHandlers(): void {
 async function authenticateUser(username: string, password: string): Promise<AuthResult> {
   try {
     const config = await loadAuthConfig();
-    const userConfig = config.users.find(u => u.username === username);
+    const userConfig = config.users.find((u: AdminUser) => u.username === username);
 
     if (!userConfig) {
       // Simulate constant-time response to prevent username enumeration
@@ -239,7 +245,7 @@ async function authenticateUser(username: string, password: string): Promise<Aut
     }
 
     // Verify password with constant-time comparison
-    const isPasswordValid = verifyPassword(password, userConfig.passwordHash);
+    const isPasswordValid = verifyPassword(password, userConfig.passwordHash!);
 
     if (!isPasswordValid) {
       return {
@@ -249,7 +255,7 @@ async function authenticateUser(username: string, password: string): Promise<Aut
     }
 
     // Create session
-    const sessionToken = event.sender.getWebContents().id.toString();
+    const sessionToken = crypto.randomUUID();
     const sessionData: SessionData = {
       userId: userConfig.id,
       username: userConfig.username,
@@ -284,7 +290,7 @@ async function authenticateUser(username: string, password: string): Promise<Aut
 /**
  * Load authentication configuration
  */
-async function loadAuthConfig(): Promise<any> {
+async function loadAuthConfig(): Promise<AuthConfig> {
   try {
     const configData = await fs.readFile(AUTH_CONFIG_FILE, 'utf8');
     return JSON.parse(configData);
@@ -299,13 +305,14 @@ async function loadAuthConfig(): Promise<any> {
  */
 async function updateUserPassword(username: string, newPassword: string): Promise<void> {
   const config = await loadAuthConfig();
-  const userIndex = config.users.findIndex(u => u.username === username);
+  const userIndex = config.users.findIndex((u: AdminUser) => u.username === username);
 
   if (userIndex === -1) {
     throw new Error('User not found');
   }
 
-  config.users[userIndex].passwordHash = hashPassword(newPassword);
+  // Use type assertion to allow setting passwordHash
+  (config.users[userIndex] as any).passwordHash = hashPassword(newPassword);
 
   await fs.writeFile(AUTH_CONFIG_FILE, JSON.stringify(config, null, 2), {
     encoding: 'utf8',

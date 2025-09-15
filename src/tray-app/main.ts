@@ -4,6 +4,7 @@ import * as path from 'path';
 // Keep a global reference of the window and tray objects
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let isQuitting = false;
 
 // IPC channel handlers
 ipcMain.handle('get-app-version', () => {
@@ -36,7 +37,6 @@ function createWindow(): void {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      enableRemoteModule: false,
       preload: path.join(__dirname, 'preload.js')
     },
     titleBarStyle: 'hiddenInset',
@@ -49,7 +49,7 @@ function createWindow(): void {
 
   // Hide the window when closed instead of quitting
   mainWindow.on('close', (event) => {
-    if (!app.isQuitting) {
+    if (!isQuitting) {
       event.preventDefault();
       mainWindow?.hide();
     }
@@ -70,7 +70,7 @@ function createWindow(): void {
 function createTray(): void {
   // Create a simple tray icon (in production, use a proper icon file)
   const iconPath = path.join(__dirname, 'assets', 'icon.png');
-  let trayIcon: nativeImage;
+  let trayIcon: Electron.NativeImage;
   
   try {
     trayIcon = nativeImage.createFromPath(iconPath);
@@ -104,7 +104,7 @@ function createTray(): void {
     {
       label: 'Quit',
       click: () => {
-        app.isQuitting = true;
+        isQuitting = true;
         app.quit();
       }
     }
@@ -156,7 +156,7 @@ app.on('window-all-closed', () => {
 
 // Handle app quitting
 app.on('before-quit', () => {
-  app.isQuitting = true;
+  isQuitting = true;
 });
 
 // Security: Prevent navigation to external URLs
