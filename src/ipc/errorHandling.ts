@@ -213,17 +213,20 @@ export function safeParseIPCMessage(message: any): {
  * Error logging utility
  */
 export function logIPCError(error: Error, context?: any): void {
+  const logData: any = {
+    severity: error instanceof IPCError ? error.severity : 'error',
+    details: error instanceof IPCError ? error.details : undefined,
+    context
+  };
+
+  // Only include stack traces in development
+  if (process.env.NODE_ENV === 'development') {
+    logData.stack = error.stack;
+  }
+
   if (error instanceof IPCError && error.shouldLog()) {
-    console.error(`IPC Error [${error.code}]: ${error.message}`, {
-      severity: error.severity,
-      details: error.details,
-      context,
-      stack: error.stack
-    });
+    console.error(`IPC Error [${error.code}]: ${error.message}`, logData);
   } else {
-    console.error('Non-IPC Error:', error.message, {
-      context,
-      stack: error.stack
-    });
+    console.error('Non-IPC Error:', error.message, logData);
   }
 }

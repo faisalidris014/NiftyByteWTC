@@ -1,0 +1,15 @@
+{
+  "id": "system-info",
+  "name": "System Information",
+  "description": "Gathers basic system information for troubleshooting",
+  "os": ["windows", "linux", "macos"],
+  "riskLevel": "low",
+  "requiresAdmin": false,
+  "script": "system-info.ps1",
+  "version": "1.0.0",
+  "parameters": [],
+  "output": {
+    "success": "System information gathered successfully",
+    "failure": "Failed to gather system information"
+  }
+}

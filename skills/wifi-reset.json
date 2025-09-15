@@ -1,0 +1,15 @@
+{
+  "id": "wifi-reset",
+  "name": "Wi-Fi Adapter Reset",
+  "description": "Checks if Wi-Fi adapter is disabled and re-enables it",
+  "os": ["windows"],
+  "riskLevel": "medium",
+  "requiresAdmin": true,
+  "script": "wifi-reset.ps1",
+  "version": "1.0.0",
+  "parameters": [],
+  "output": {
+    "success": "Wi-Fi adapter successfully reset",
+    "failure": "Failed to reset Wi-Fi adapter"
+  }
+}

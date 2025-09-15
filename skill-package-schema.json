@@ -1,0 +1,884 @@
+{
+  "$schema": "http://json-schema.org/dn/draft-07/schema#",
+  "$id": "https://github.com/NB-WindowsAITroubleshooter/skill-package-schema.json",
+  "title": "Windows AI Troubleshooter Skill Package Schema",
+  "description": "Schema for validating Windows AI Troubleshooter skill packages",
+  "type": "object",
+  "required": [
+    "metadata",
+    "execution",
+    "input",
+    "output",
+    "security",
+    "resources",
+    "errorHandling",
+    "logging"
+  ],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "description": "Skill package metadata and identification",
+      "required": ["name", "version", "description", "author"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique name of the skill (snake_case recommended)",
+          "pattern": "^[a-z][a-z0-9_]*[a-z0-9]$",
+          "minLength": 3,
+          "maxLength": 50
+        },
+        "version": {
+          "type": "string",
+          "description": "Semantic version of the skill",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description of what the skill does",
+          "minLength": 10,
+          "maxLength": 200
+        },
+        "author": {
+          "type": "object",
+          "description": "Author information",
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Author's name",
+              "minLength": 2
+            },
+            "email": {
+              "type": "string",
+              "format": "email",
+              "description": "Author's email address"
+            },
+            "organization": {
+              "type": "string",
+              "description": "Author's organization"
+            }
+          }
+        },
+        "category": {
+          "type": "string",
+          "description": "Category of the skill",
+          "enum": [
+            "system",
+            "network",
+            "security",
+            "performance",
+            "application",
+            "hardware",
+            "diagnostic",
+            "remediation",
+            "monitoring"
+          ]
+        },
+        "tags": {
+          "type": "array",
+          "description": "Tags for categorization and search",
+          "items": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 20
+          },
+          "maxItems": 10
+        },
+        "created": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        },
+        "updated": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "description": "Execution requirements and constraints",
+      "required": ["requirements"],
+      "properties": {
+        "requirements": {
+          "type": "object",
+          "description": "System requirements for execution",
+          "properties": {
+            "os": {
+              "type": "object",
+              "description": "Operating system requirements",
+              "properties": {
+                "minVersion": {
+                  "type": "string",
+                  "description": "Minimum Windows version required",
+                  "pattern": "^\\d+\\.\\d+$"
+                },
+                "maxVersion": {
+                  "type": "string",
+                  "description": "Maximum Windows version supported",
+                  "pattern": "^\\d+\\.\\d+$"
+                },
+                "editions": {
+                  "type": "array",
+                  "description": "Supported Windows editions",
+                  "items": {
+                    "type": "string",
+                    "enum": ["Home", "Pro", "Enterprise", "Education", "Server"]
+                  }
+                },
+                "architecture": {
+                  "type": "array",
+                  "description": "Supported architectures",
+                  "items": {
+                    "type": "string",
+                    "enum": ["x64", "x86", "arm64"]
+                  }
+                }
+              }
+            },
+            "permissions": {
+              "type": "object",
+              "description": "Required permissions and privileges",
+              "properties": {
+                "elevation": {
+                  "type": "string",
+                  "description": "Elevation level required",
+                  "enum": ["none", "user", "admin", "system"]
+                },
+                "userRights": {
+                  "type": "array",
+                  "description": "Specific user rights required",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "SeDebugPrivilege",
+                      "SeBackupPrivilege",
+                      "SeRestorePrivilege",
+                      "SeSystemtimePrivilege",
+                      "SeShutdownPrivilege",
+                      "SeRemoteShutdownPrivilege",
+                      "SeTakeOwnershipPrivilege",
+                      "SeLoadDriverPrivilege",
+                      "SeSecurityPrivilege",
+                      "SeSystemEnvironmentPrivilege",
+                      "SeProfileSingleProcessPrivilege",
+                      "SeIncreaseBasePriorityPrivilege",
+                      "SeCreatePagefilePrivilege",
+                      "SeCreatePermanentPrivilege",
+                      "SeAssignPrimaryTokenPrivilege",
+                      "SeLockMemoryPrivilege",
+                      "SeIncreaseQuotaPrivilege",
+                      "SeUnsolicitedInputPrivilege",
+                      "SeMachineAccountPrivilege",
+                      "SeTcbPrivilege",
+                      "SeCreateTokenPrivilege",
+                      "SeCreateGlobalPrivilege",
+                      "SeTrustedCredManAccessPrivilege",
+                      "SeRelabelPrivilege",
+                      "SeSystemProfilePrivilege",
+                      "SeUndockPrivilege",
+                      "SeManageVolumePrivilege",
+                      "SeImpersonatePrivilege",
+                      "SeDelegateSessionUserImpersonatePrivilege"
+                    ]
+                  }
+                }
+              }
+            },
+            "dependencies": {
+              "type": "array",
+              "description": "External dependencies required",
+              "items": {
+                "type": "object",
+                "required": ["name", "type"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Dependency name"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Dependency type",
+                    "enum": ["executable", "library", "service", "registry", "file"]
+                  },
+                  "version": {
+                    "type": "string",
+                    "description": "Required version"
+                  },
+                  "optional": {
+                    "type": "boolean",
+                    "description": "Whether dependency is optional",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "entryPoint": {
+          "type": "string",
+          "description": "Main execution script or command",
+          "minLength": 1
+        },
+        "interpreter": {
+          "type": "string",
+          "description": "Interpreter or runtime required",
+          "enum": ["powershell", "cmd", "python", "node", "dotnet", "native"]
+        },
+        "workingDirectory": {
+          "type": "string",
+          "description": "Working directory for execution"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "description": "Input parameters and validation rules",
+      "properties": {
+        "parameters": {
+          "type": "array",
+          "description": "Input parameters accepted by the skill",
+          "items": {
+            "type": "object",
+            "required": ["name", "type"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Parameter name (snake_case)",
+                "pattern": "^[a-z][a-z0-9_]*[a-z0-9]$"
+              },
+              "type": {
+                "type": "string",
+                "description": "Parameter data type",
+                "enum": ["string", "number", "boolean", "array", "object"]
+              },
+              "description": {
+                "type": "string",
+                "description": "Parameter description"
+              },
+              "required": {
+                "type": "boolean",
+                "description": "Whether parameter is required",
+                "default": false
+              },
+              "default": {
+                "type": ["string", "number", "boolean", "array", "object", "null"],
+                "description": "Default value if not provided"
+              },
+              "validation": {
+                "type": "object",
+                "description": "Validation rules for the parameter",
+                "properties": {
+                  "pattern": {
+                    "type": "string",
+                    "description": "Regex pattern for validation"
+                  },
+                  "minLength": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Minimum length for strings/arrays"
+                  },
+                  "maxLength": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Maximum length for strings/arrays"
+                  },
+                  "minimum": {
+                    "type": "number",
+                    "description": "Minimum value for numbers"
+                  },
+                  "maximum": {
+                    "type": "number",
+                    "description": "Maximum value for numbers"
+                  },
+                  "enum": {
+                    "type": "array",
+                    "description": "Allowed values",
+                    "minItems": 1
+                  },
+                  "customValidator": {
+                    "type": "string",
+                    "description": "Custom validation script/function"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "schemaValidation": {
+          "type": "boolean",
+          "description": "Whether to validate input against schema",
+          "default": true
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "description": "Output format specification",
+      "required": ["format"],
+      "properties": {
+        "format": {
+          "type": "string",
+          "description": "Output data format",
+          "enum": ["json", "xml", "text", "csv"]
+        },
+        "schema": {
+          "type": "object",
+          "description": "Output data schema",
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether operation succeeded"
+            },
+            "result": {
+              "type": "object",
+              "description": "Main result data"
+            },
+            "errors": {
+              "type": "array",
+              "description": "Error information",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "Error code"
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Error message"
+                  },
+                  "details": {
+                    "type": "object",
+                    "description": "Additional error details"
+                  }
+                }
+              }
+            },
+            "warnings": {
+              "type": "array",
+              "description": "Warning messages",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "Warning code"
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Warning message"
+                  }
+                }
+              }
+            },
+            "metrics": {
+              "type": "object",
+              "description": "Performance metrics",
+              "properties": {
+                "executionTime": {
+                  "type": "number",
+                  "description": "Execution time in milliseconds"
+                },
+                "memoryUsage": {
+                  "type": "number",
+                  "description": "Memory usage in bytes"
+                },
+                "cpuUsage": {
+                  "type": "number",
+                  "description": "CPU usage percentage"
+                }
+              }
+            }
+          }
+        },
+        "requiredFields": {
+          "type": "array",
+          "description": "Required fields in output",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "description": "Security constraints and sandbox requirements",
+      "required": ["sandbox"],
+      "properties": {
+        "sandbox": {
+          "type": "object",
+          "description": "Sandbox execution constraints",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether to run in sandbox mode",
+              "default": true
+            },
+            "isolationLevel": {
+              "type": "string",
+              "description": "Isolation level",
+              "enum": ["none", "low", "medium", "high", "maximum"],
+              "default": "medium"
+            },
+            "allowedOperations": {
+              "type": "array",
+              "description": "Allowed system operations",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "file_read",
+                  "file_write",
+                  "registry_read",
+                  "registry_write",
+                  "network_access",
+                  "process_creation",
+                  "service_control",
+                  "system_info"
+                ]
+              }
+            },
+            "restrictedOperations": {
+              "type": "array",
+              "description": "Explicitly restricted operations",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "file_delete",
+                  "registry_delete",
+                  "system_shutdown",
+                  "user_modification",
+                  "network_listen"
+                ]
+              }
+            }
+          }
+        },
+        "permissions": {
+          "type": "object",
+          "description": "Fine-grained permission control",
+          "properties": {
+            "fileSystem": {
+              "type": "object",
+              "description": "File system access permissions",
+              "properties": {
+                "readPaths": {
+                  "type": "array",
+                  "description": "Allowed read paths",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "writePaths": {
+                  "type": "array",
+                  "description": "Allowed write paths",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "denyPaths": {
+                  "type": "array",
+                  "description": "Explicitly denied paths",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "registry": {
+              "type": "object",
+              "description": "Registry access permissions",
+              "properties": {
+                "readKeys": {
+                  "type": "array",
+                  "description": "Allowed registry keys for reading",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "writeKeys": {
+                  "type": "array",
+                  "description": "Allowed registry keys for writing",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "denyKeys": {
+                  "type": "array",
+                  "description": "Explicitly denied registry keys",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "network": {
+              "type": "object",
+              "description": "Network access permissions",
+              "properties": {
+                "allowedEndpoints": {
+                  "type": "array",
+                  "description": "Allowed network endpoints",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "deniedEndpoints": {
+                  "type": "array",
+                  "description": "Denied network endpoints",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "protocols": {
+                  "type": "array",
+                  "description": "Allowed network protocols",
+                  "items": {
+                    "type": "string",
+                    "enum": ["http", "https", "tcp", "udp", "icmp"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "signature": {
+          "type": "object",
+          "description": "Digital signature requirements",
+          "properties": {
+            "required": {
+              "type": "boolean",
+              "description": "Whether digital signature is required",
+              "default": false
+            },
+            "certificateAuthority": {
+              "type": "string",
+              "description": "Required certificate authority"
+            },
+            "hashAlgorithm": {
+              "type": "string",
+              "description": "Hash algorithm for verification",
+              "enum": ["SHA256", "SHA384", "SHA512"],
+              "default": "SHA256"
+            }
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Resource limits and timeout configuration",
+      "required": ["timeout"],
+      "properties": {
+        "timeout": {
+          "type": "object",
+          "description": "Timeout configuration",
+          "properties": {
+            "execution": {
+              "type": "integer",
+              "description": "Maximum execution time in milliseconds",
+              "minimum": 1000,
+              "maximum": 3600000,
+              "default": 30000
+            },
+            "network": {
+              "type": "integer",
+              "description": "Network operation timeout in milliseconds",
+              "minimum": 1000,
+              "maximum": 60000,
+              "default": 10000
+            },
+            "file": {
+              "type": "integer",
+              "description": "File operation timeout in milliseconds",
+              "minimum": 1000,
+              "maximum": 30000,
+              "default": 5000
+            }
+          }
+        },
+        "memory": {
+          "type": "object",
+          "description": "Memory usage limits",
+          "properties": {
+            "maxWorkingSet": {
+              "type": "integer",
+              "description": "Maximum working set size in bytes",
+              "minimum": 1048576,
+              "maximum": 1073741824,
+              "default": 67108864
+            },
+            "maxVirtual": {
+              "type": "integer",
+              "description": "Maximum virtual memory in bytes",
+              "minimum": 1048576,
+              "maximum": 2147483648,
+              "default": 134217728
+            }
+          }
+        },
+        "cpu": {
+          "type": "object",
+          "description": "CPU usage limits",
+          "properties": {
+            "maxUsage": {
+              "type": "number",
+              "description": "Maximum CPU usage percentage",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "affinity": {
+              "type": "array",
+              "description": "Allowed CPU cores",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "disk": {
+          "type": "object",
+          "description": "Disk usage limits",
+          "properties": {
+            "maxWrite": {
+              "type": "integer",
+              "description": "Maximum disk write in bytes",
+              "minimum": 0,
+              "maximum": 10737418240,
+              "default": 10485760
+            },
+            "maxRead": {
+              "type": "integer",
+              "description": "Maximum disk read in bytes",
+              "minimum": 0,
+              "maximum": 10737418240,
+              "default": 10485760
+            }
+          }
+        }
+      }
+    },
+    "errorHandling": {
+      "type": "object",
+      "description": "Error handling and recovery instructions",
+      "required": ["strategies"],
+      "properties": {
+        "strategies": {
+          "type": "array",
+          "description": "Error handling strategies",
+          "items": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Error handling strategy type",
+                "enum": ["retry", "fallback", "circuitbreaker", "timeout", "log"]
+              },
+              "config": {
+                "type": "object",
+                "description": "Strategy configuration"
+              }
+            }
+          }
+        },
+        "retryPolicy": {
+          "type": "object",
+          "description": "Retry policy configuration",
+          "properties": {
+            "maxAttempts": {
+              "type": "integer",
+              "description": "Maximum retry attempts",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 3
+            },
+            "backoff": {
+              "type": "object",
+              "description": "Backoff strategy",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "Backoff type",
+                  "enum": ["fixed", "exponential", "random"],
+                  "default": "exponential"
+                },
+                "delay": {
+                  "type": "integer",
+                  "description": "Initial delay in milliseconds",
+                  "minimum": 100,
+                  "maximum": 5000,
+                  "default": 1000
+                },
+                "maxDelay": {
+                  "type": "integer",
+                  "description": "Maximum delay in milliseconds",
+                  "minimum": 1000,
+                  "maximum": 30000,
+                  "default": 10000
+                }
+              }
+            },
+            "retryableErrors": {
+              "type": "array",
+              "description": "List of retryable error codes",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "fallback": {
+          "type": "object",
+          "description": "Fallback behavior configuration",
+          "properties": {
+            "action": {
+              "type": "string",
+              "description": "Fallback action",
+              "enum": ["return_default", "use_alternative", "notify", "abort"],
+              "default": "return_default"
+            },
+            "defaultValue": {
+              "type": ["string", "number", "boolean", "object", "array", "null"],
+              "description": "Default value to return on failure"
+            }
+          }
+        },
+        "circuitBreaker": {
+          "type": "object",
+          "description": "Circuit breaker configuration",
+          "properties": {
+            "failureThreshold": {
+              "type": "integer",
+              "description": "Number of failures before opening circuit",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 5
+            },
+            "resetTimeout": {
+              "type": "integer",
+              "description": "Circuit reset timeout in milliseconds",
+              "minimum": 1000,
+              "maximum": 60000,
+              "default": 30000
+            },
+            "halfOpenMaxCalls": {
+              "type": "integer",
+              "description": "Maximum calls in half-open state",
+              "minimum": 1,
+              "maximum": 10,
+              "default": 3
+            }
+          }
+        }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "description": "Logging and monitoring configuration",
+      "required": ["level"],
+      "properties": {
+        "level": {
+          "type": "string",
+          "description": "Default log level",
+          "enum": ["debug", "info", "warning", "error", "critical"],
+          "default": "info"
+        },
+        "format": {
+          "type": "string",
+          "description": "Log message format",
+          "enum": ["text", "json", "xml"],
+          "default": "json"
+        },
+        "destinations": {
+          "type": "array",
+          "description": "Log destinations",
+          "items": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Destination type",
+                "enum": ["file", "console", "eventlog", "syslog", "http"]
+              },
+              "config": {
+                "type": "object",
+                "description": "Destination configuration"
+              }
+            }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "description": "Metrics collection configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether to collect metrics",
+              "default": true
+            },
+            "interval": {
+              "type": "integer",
+              "description": "Metrics collection interval in milliseconds",
+              "minimum": 1000,
+              "maximum": 60000,
+              "default": 5000
+            },
+            "types": {
+              "type": "array",
+              "description": "Types of metrics to collect",
+              "items": {
+                "type": "string",
+                "enum": ["cpu", "memory", "disk", "network", "execution_time"]
+              }
+            }
+          }
+        },
+        "audit": {
+          "type": "object",
+          "description": "Audit logging configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether to enable audit logging",
+              "default": false
+            },
+            "events": {
+              "type": "array",
+              "description": "Events to audit",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "execution_start",
+                  "execution_end",
+                  "parameter_validation",
+                  "security_violation",
+                  "resource_exhaustion"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ErrorCode": {
+      "type": "string",
+      "pattern": "^[A-Z_]+_[A-Z_]+$"
+    },
+    "FilePath": {
+      "type": "string",
+      "pattern": "^[a-zA-Z]:\\\\\\([^\\\\]+\\)*[^\\\\]+$|^/[^/]+(/[^/]+)*$"
+    },
+    "RegistryPath": {
+      "type": "string",
+      "pattern": "^[A-Z_]+\\\\\\([^\\\\]+\\)*[^\\\\]+$"
+    }
+  }
+}
