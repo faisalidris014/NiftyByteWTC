@@ -1,0 +1,15 @@
+{
+  "id": "word-file-recovery",
+  "name": "Word Document Recovery",
+  "description": "Scans Microsoft Word autorecover locations and surfaces recently recoverable files.",
+  "os": ["windows"],
+  "riskLevel": "low",
+  "requiresAdmin": false,
+  "script": "word-file-recovery.ps1",
+  "version": "1.0.0",
+  "parameters": [],
+  "output": {
+    "success": "Recovered Word autorecovery file listing generated successfully.",
+    "failure": "Failed to locate Word autorecovery files."
+  }
+}

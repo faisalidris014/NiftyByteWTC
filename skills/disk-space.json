@@ -1,16 +1,16 @@
 {
   "id": "disk-space",
-  "name": "Disk Space Check",
-  "description": "Checks available disk space on system drives",
+  "name": "Disk Space Check & Cleanup",
+  "description": "Audits disk space and removes aged files from safe temporary locations when capacity is low.",
   "os": ["windows", "linux", "macos"],
   "riskLevel": "low",
   "requiresAdmin": false,
   "windowsScript": "disk-space.ps1",
   "unixScript": "disk-space.sh",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "parameters": [],
   "output": {
-    "success": "Disk space information gathered",
-    "failure": "Failed to check disk space"
+    "success": "Disk space information gathered and cleanup evaluated.",
+    "failure": "Failed to check disk space or perform cleanup."
   }
 }

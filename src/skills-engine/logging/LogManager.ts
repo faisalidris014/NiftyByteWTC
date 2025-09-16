@@ -1,5 +1,5 @@
 import { Logger } from './Logger';
-import { LoggerConfig } from './types';
+import { LoggerConfig, EndpointHealthStatus, QueueHealthStatus, AlertRule, NotificationChannelConfig } from './types';
 import { MonitoringSystem } from './MonitoringSystem';
 import { SearchCriteria, SearchResult, LogFilter } from './types';
 
@@ -72,6 +72,22 @@ export class LogManager {
 
   recordAuditEvent(entry: any): void {
     this.monitoringSystem.recordAuditEvent(entry);
+  }
+
+  updateEndpointHealth(status: EndpointHealthStatus): void {
+    this.monitoringSystem.updateEndpointHealth(status);
+  }
+
+  markEndpointOffline(endpointId: string, reason?: string): void {
+    this.monitoringSystem.markEndpointOffline(endpointId, reason);
+  }
+
+  updateQueueHealth(stats: QueueHealthStatus): void {
+    this.monitoringSystem.updateQueueHealth(stats);
+  }
+
+  configureAlerting(options: { rules?: AlertRule[]; channels?: NotificationChannelConfig[] }): void {
+    this.monitoringSystem.configureAlerting(options);
   }
 
   // Search functionality

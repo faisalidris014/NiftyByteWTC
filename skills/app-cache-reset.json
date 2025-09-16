@@ -1,0 +1,15 @@
+{
+  "id": "app-cache-reset",
+  "name": "Teams & Outlook Cache Reset",
+  "description": "Gracefully stops Teams and Outlook, archives existing cache directories, and provisions fresh caches.",
+  "os": ["windows"],
+  "riskLevel": "medium",
+  "requiresAdmin": true,
+  "script": "app-cache-reset.ps1",
+  "version": "1.0.0",
+  "parameters": [],
+  "output": {
+    "success": "Teams and Outlook caches reset successfully.",
+    "failure": "Failed to reset Teams/Outlook caches."
+  }
+}

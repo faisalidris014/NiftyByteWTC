@@ -34,7 +34,7 @@ npm run build
 
 # Create distribution packages
 npm run dist           # All platforms
-npm run dist:win       # Windows only
+npm run dist:win       # Windows NSIS + MSI bundles (x64)
 npm run dist:win-msi   # Windows MSI only
 
 # Create unpacked directory (for testing)
@@ -71,6 +71,7 @@ Available MSI properties for silent installation:
 - `CREATEDESKTOPSHORTCUT` - Create desktop shortcut (1/0)
 - `CREATESTARTMENUSHORTCUT` - Create start menu shortcut (1/0)
 - `AUTOSTART` - Auto-start with Windows (1/0)
+- `WTC_UPDATE_CHANNEL` - Override the update channel (`stable` or `pilot`)
 
 ### SCCM/Intune Deployment
 
@@ -119,6 +120,24 @@ The GitHub Actions workflow automatically:
 git tag -a v1.0.0 -m "Release v1.0.0"
 git push origin v1.0.0
 ```
+
+## Auto-Update Channels
+
+Auto-update behavior is managed through `config/update-config.json` and the environment variables `UPDATE_CHANNEL` / `UPDATE_FEED_URL`.
+
+- **Channels**: `stable` (default) for production, `pilot` for prerelease testing.
+- **Feed URL**: Defaults to `https://updates.niftybyte.com/wtc/<channel>`; override for staging by setting `UPDATE_FEED_URL`.
+- **Intervals**: Updates are checked on startup and every 30 minutes. Differential `*.blockmap` files are generated automatically.
+
+## Rollback Mechanism
+
+Use `build/rollback.ps1` to reinstall a previously archived MSI if an update must be reverted:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File build/rollback.ps1 -PreviousInstallerPath "C:\\ProgramData\\NiftyByte\\WTC\\Packages\\wtc-1.0.0.msi"
+```
+
+Archives of prior installers should be stored in `C:\ProgramData\NiftyByte\WTC\Packages` (configurable via `WTC_PACKAGE_BACKUP`). Logs are written to `%LOCALAPPDATA%\NiftyByte\WTC\Logs`.
 
 ## Performance Optimization
 

@@ -35,6 +35,9 @@ msiexec /i "Windows Troubleshooting Companion 1.0.0.msi" /quiet /norestart INSTA
 # Disable desktop shortcut
 msiexec /i "Windows Troubleshooting Companion 1.0.0.msi" /quiet /norestart CREATEDESKTOPSHORTCUT=0
 
+# Target the pilot update channel
+msiexec /i "Windows Troubleshooting Companion 1.0.0.msi" /quiet /norestart WTC_UPDATE_CHANNEL=pilot
+
 # Enable auto-start
 msiexec /i "Windows Troubleshooting Companion 1.0.0.msi" /quiet /norestart AUTOSTART=1
 ```
@@ -95,20 +98,15 @@ Windows Registry Editor Version 5.00
 
 #### Emergency Rollback
 ```bash
-# Stop application
-taskkill /f /im "Windows Troubleshooting Companion.exe"
+# Execute packaged rollback helper
+powershell.exe -ExecutionPolicy Bypass -File "C:\\Program Files\\Windows Troubleshooting Companion\\resources\\app\\build\\rollback.ps1" ^
+  -PreviousInstallerPath "C:\\ProgramData\\NiftyByte\\WTC\\Packages\\wtc-1.0.0.msi"
 
-# Uninstall current version
-msiexec /x "Windows Troubleshooting Companion 1.0.0.msi" /quiet /norestart
+# Restore configuration if required
+xcopy "C:\\Backup\\WTC\\config.json" "C:\\ProgramData\\WTC\\" /Y
 
-# Install previous version
-msiexec /i "Windows Troubleshooting Companion 0.9.0.msi" /quiet /norestart
-
-# Restore configuration
-xcopy "C:\Backup\WTC\config.json" "C:\ProgramData\WTC\" /Y
-
-# Start application
-start "" "C:\Program Files\Windows Troubleshooting Companion\WTC.exe"
+# Relaunch application
+start "" "C:\\Program Files\\Windows Troubleshooting Companion\\WTC.exe"
 ```
 
 #### Rollback Validation
@@ -201,6 +199,13 @@ alerts:
     severity: warning
     notify: slack
 ```
+
+#### Notification Channels
+- Email: `alerts@example.com` (warning and above)
+- Slack: `#wtc-alerts` webhook (critical)
+- Teams: `operations-room` webhook (critical)
+
+Configure channels at runtime using `LogManager.configureAlerting({ channels })`.
 
 ### Monitoring Tools Integration
 

@@ -212,7 +212,19 @@ export class MonitoringDashboard {
         avgExecutionTime: `${metrics.historical.averageExecutionTimeMs.toFixed(0)}ms`,
         securityEvents: metrics.historical.totalSecurityEvents
       },
-      alerts: metrics.alerts.filter(alert => !alert.acknowledged).length
+      alerts: metrics.alerts.filter(alert => !alert.acknowledged).length,
+      endpoints: metrics.endpointHealth.map((endpoint) => ({
+        id: endpoint.endpointId,
+        status: endpoint.status,
+        lastHeartbeat: endpoint.lastHeartbeat,
+        details: endpoint.details
+      })),
+      queue: metrics.queueHealth ? {
+        pending: metrics.queueHealth.pending,
+        failed: metrics.queueHealth.failed,
+        retrying: metrics.queueHealth.retrying,
+        oldestMinutes: Math.round(metrics.queueHealth.oldestItemAge / 60000)
+      } : null
     };
   }
 

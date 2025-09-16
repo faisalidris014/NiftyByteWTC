@@ -1,0 +1,17 @@
+{
+  "feedURL": "https://updates.niftybyte.com/wtc",
+  "defaultChannel": "stable",
+  "channels": {
+    "stable": {
+      "description": "Production-ready updates that have passed full QA.",
+      "allowPrerelease": false
+    },
+    "pilot": {
+      "description": "Early access builds for pilot groups; may include prerelease fixes.",
+      "allowPrerelease": true
+    }
+  },
+  "autoDownload": true,
+  "checkOnStartup": true,
+  "retryIntervalMinutes": 30
+}

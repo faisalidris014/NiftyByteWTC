@@ -1,0 +1,15 @@
+{
+  "id": "printer-queue-clear",
+  "name": "Printer Queue Reset",
+  "description": "Stops the print spooler, clears queued print jobs, and restarts the service.",
+  "os": ["windows"],
+  "riskLevel": "medium",
+  "requiresAdmin": true,
+  "script": "printer-queue-clear.ps1",
+  "version": "1.0.0",
+  "parameters": [],
+  "output": {
+    "success": "Print spooler reset and queue cleared successfully.",
+    "failure": "Failed to reset the print spooler service."
+  }
+}

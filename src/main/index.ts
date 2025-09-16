@@ -1,4 +1,6 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } from 'electron';
+import { autoUpdater } from 'electron-updater';
+import * as fs from 'fs';
 import * as path from 'path';
 import { initializeIPCHandlers, registerSkill } from '../ipc/mainHandlers';
 import { initializeAuthHandlers, cleanupAuthHandlers } from '../ipc/adminAuthHandlers';
@@ -10,9 +12,103 @@ const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_IS_
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
+let updateCheckInterval: NodeJS.Timeout | null = null;
 
 // Application version
 const APP_VERSION = '1.0.0';
+
+interface UpdateChannelConfig {
+  description?: string;
+  allowPrerelease?: boolean;
+}
+
+interface UpdateConfig {
+  feedURL?: string;
+  defaultChannel?: string;
+  channels?: Record<string, UpdateChannelConfig>;
+  autoDownload?: boolean;
+  checkOnStartup?: boolean;
+  retryIntervalMinutes?: number;
+}
+
+function loadUpdateConfig(): UpdateConfig | null {
+  const appPath = app.getAppPath();
+  const candidatePaths = [
+    path.join(appPath, 'config', 'update-config.json'),
+    path.join(process.cwd(), 'config', 'update-config.json')
+  ];
+
+  for (const candidate of candidatePaths) {
+    if (fs.existsSync(candidate)) {
+      try {
+        const raw = fs.readFileSync(candidate, 'utf-8');
+        return JSON.parse(raw) as UpdateConfig;
+      } catch (error) {
+        console.error('Failed to parse update configuration:', error);
+      }
+    }
+  }
+
+  console.warn('Update configuration not found; skipping auto-update initialization');
+  return null;
+}
+
+function initializeAutoUpdater(): void {
+  if (isDev || process.platform !== 'win32') {
+    return;
+  }
+
+  const config = loadUpdateConfig();
+  if (!config) {
+    return;
+  }
+
+  const channel = process.env.UPDATE_CHANNEL || config.defaultChannel || 'stable';
+  const feedURL = process.env.UPDATE_FEED_URL || config.feedURL;
+  const channelConfig = config.channels?.[channel];
+
+  autoUpdater.autoDownload = config.autoDownload !== false;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.allowPrerelease = channelConfig?.allowPrerelease ?? false;
+
+  if (feedURL) {
+    const channelUrl = `${feedURL.replace(/\/$/, '')}/${channel}`;
+    autoUpdater.setFeedURL({ url: channelUrl, channel });
+  }
+
+  autoUpdater.on('checking-for-update', () => {
+    console.log(`[updater] Checking for updates on channel "${channel}"`);
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('[updater] Update available:', info.version);
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    console.log('[updater] No updates available');
+  });
+
+  autoUpdater.on('error', (error) => {
+    console.error('[updater] Error during update process:', error);
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    console.log('[updater] Update downloaded; will install on quit');
+  });
+
+  const scheduleCheck = () => {
+    autoUpdater.checkForUpdates().catch((error) => {
+      console.error('[updater] Failed to check for updates:', error);
+    });
+  };
+
+  if (config.checkOnStartup !== false) {
+    scheduleCheck();
+  }
+
+  const retryMinutes = Math.max(5, config.retryIntervalMinutes ?? 30);
+  updateCheckInterval = setInterval(scheduleCheck, retryMinutes * 60 * 1000);
+}
 
 function createWindow(): void {
   // Create the browser window
@@ -235,6 +331,9 @@ app.whenReady().then(async () => {
   // Register sample skills
   registerSampleSkills();
 
+  // Configure auto-update channel handling
+  initializeAutoUpdater();
+
   // Create tray and window
   createTray();
   createWindow();
@@ -271,6 +370,11 @@ app.on('will-quit', async (event) => {
 
   // Cleanup authentication handlers
   cleanupAuthHandlers();
+
+  if (updateCheckInterval) {
+    clearInterval(updateCheckInterval);
+    updateCheckInterval = null;
+  }
   console.log('Application quitting...');
 });
 

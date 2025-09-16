@@ -1,7 +1,82 @@
-import { PerformanceMetrics, MonitoringStats, AuditLogEntry, DashboardMetrics } from './types';
+import {
+  PerformanceMetrics,
+  MonitoringStats,
+  AuditLogEntry,
+  DashboardMetrics,
+  AlertRule,
+  AlertEvaluationContext,
+  EndpointHealthStatus,
+  QueueHealthStatus,
+  NotificationChannelConfig,
+  DashboardAlert,
+  AlertViolation
+} from './types';
 import { Logger } from './Logger';
+import { AlertManager } from './AlertManager';
 import * as os from 'os';
 import * as process from 'process';
+
+const DEFAULT_ALERT_RULES: AlertRule[] = [
+  {
+    id: 'skill-failure-spike',
+    description: 'High failure rate detected for troubleshooting skills',
+    severity: 'warning',
+    cooldownMinutes: 5,
+    evaluate: ({ monitoringStats }): AlertViolation | null => {
+      const { totalExecutions, failedExecutions } = monitoringStats;
+      if (totalExecutions < 5) return null;
+      const failureRate = failedExecutions / totalExecutions;
+      if (failedExecutions >= 5 && failureRate >= 0.3) {
+        return {
+          ruleId: 'skill-failure-spike',
+          severity: 'warning' as const,
+          message: `Skill failure rate elevated at ${(failureRate * 100).toFixed(1)}% (${failedExecutions}/${totalExecutions}).`,
+          timestamp: Date.now(),
+          details: { failedExecutions, totalExecutions, failureRate }
+        };
+      }
+      return null;
+    }
+  },
+  {
+    id: 'endpoint-unhealthy',
+    description: 'One or more endpoints reporting unhealthy status',
+    severity: 'critical',
+    cooldownMinutes: 10,
+    evaluate: ({ endpointHealth }): AlertViolation | null => {
+      const unhealthy = endpointHealth.filter((endpoint) => endpoint.status === 'unhealthy' || endpoint.status === 'offline');
+      if (!unhealthy.length) return null;
+      return {
+        ruleId: 'endpoint-unhealthy',
+        severity: 'critical' as const,
+        message: `${unhealthy.length} endpoint(s) reporting unhealthy or offline status.`,
+        timestamp: Date.now(),
+        details: { endpoints: unhealthy }
+      };
+    }
+  },
+  {
+    id: 'queue-backlog',
+    description: 'Offline queue backlog detected',
+    severity: 'warning',
+    cooldownMinutes: 5,
+    evaluate: ({ queueHealth }): AlertViolation | null => {
+      if (!queueHealth) return null;
+      const { pending, failed, oldestItemAge } = queueHealth;
+      const oldestMinutes = oldestItemAge / (60 * 1000);
+      if (pending >= 10 || failed > 0 || oldestMinutes > 30) {
+        return {
+          ruleId: 'queue-backlog',
+          severity: failed > 0 ? 'critical' : 'warning',
+          message: `Offline queue backlog detected (pending: ${pending}, failed: ${failed}, oldest: ${Math.round(oldestMinutes)}m).`,
+          timestamp: Date.now(),
+          details: queueHealth
+        };
+      }
+      return null;
+    }
+  }
+];
 
 export class MonitoringSystem {
   private metrics: Map<string, PerformanceMetrics> = new Map();
@@ -14,11 +89,32 @@ export class MonitoringSystem {
     recentErrors: 0
   };
 
-  private alerts: DashboardMetrics['alerts'] = [];
+  private alerts: DashboardAlert[] = [];
   private updateInterval: NodeJS.Timeout | null = null;
+  private statsResetInterval: NodeJS.Timeout | null = null;
+  private alertManager: AlertManager;
+  private endpointHealth: Map<string, EndpointHealthStatus> = new Map();
+  private queueHealth?: QueueHealthStatus;
+
+  private notificationChannels: NotificationChannelConfig[] = [];
 
   constructor(private logger: Logger) {
+    this.alertManager = new AlertManager(logger);
+    this.alertManager.setRules(DEFAULT_ALERT_RULES);
     this.startMonitoring();
+  }
+
+  configureAlerting(options: {
+    rules?: AlertRule[];
+    channels?: NotificationChannelConfig[];
+  }): void {
+    if (options.rules) {
+      this.alertManager.setRules(options.rules);
+    }
+    if (options.channels) {
+      this.notificationChannels = options.channels;
+      this.alertManager.configureNotifications(options.channels);
+    }
   }
 
   private createEmptyStats(): MonitoringStats {
@@ -50,8 +146,7 @@ export class MonitoringSystem {
       this.updateRealTimeMetrics();
     }, 1000);
 
-    // Reset stats every hour
-    setInterval(() => {
+    this.statsResetInterval = setInterval(() => {
       this.resetHourlyStats();
     }, 60 * 60 * 1000);
   }
@@ -117,6 +212,43 @@ export class MonitoringSystem {
     }, { component: 'monitoring', executionId, skillId });
   }
 
+  updateEndpointHealth(status: EndpointHealthStatus): void {
+    this.endpointHealth.set(status.endpointId, { ...status, lastHeartbeat: Date.now() });
+    this.logger.info('Endpoint health updated', {
+      endpointId: status.endpointId,
+      status: status.status,
+      details: status.details
+    }, { component: 'monitoring' });
+
+    this.evaluateAlerts();
+  }
+
+  markEndpointOffline(endpointId: string, reason?: string): void {
+    const existing = this.endpointHealth.get(endpointId);
+    if (!existing) {
+      this.endpointHealth.set(endpointId, {
+        endpointId,
+        name: endpointId,
+        status: 'offline',
+        lastHeartbeat: Date.now(),
+        details: reason
+      });
+    } else {
+      existing.status = 'offline';
+      existing.details = reason;
+      existing.lastHeartbeat = Date.now();
+      this.endpointHealth.set(endpointId, existing);
+    }
+    this.logger.warn('Endpoint marked offline', { endpointId, reason }, { component: 'monitoring' });
+    this.evaluateAlerts();
+  }
+
+  updateQueueHealth(stats: QueueHealthStatus): void {
+    this.queueHealth = stats;
+    this.logger.debug('Offline queue metrics updated', stats, { component: 'monitoring' });
+    this.evaluateAlerts();
+  }
+
   updateExecutionMetrics(
     executionId: string,
     updates: Partial<PerformanceMetrics>
@@ -151,6 +283,8 @@ export class MonitoringSystem {
       durationMs: metrics.durationMs,
       error
     }, { component: 'monitoring', executionId, skillId: metrics.skillId });
+
+    this.evaluateAlerts();
   }
 
   private updateStatistics(metrics: PerformanceMetrics): void {
@@ -243,8 +377,13 @@ export class MonitoringSystem {
 
     // Generate alert for high severity events
     if (severity === 'high') {
-      this.addAlert('critical', `High severity security event: ${details}`, executionId);
+      this.addManualAlert('critical', `High severity security event: ${details}`, {
+        executionId,
+        severity
+      });
     }
+
+    this.evaluateAlerts();
   }
 
   recordAuditEvent(entry: AuditLogEntry): void {
@@ -268,29 +407,79 @@ export class MonitoringSystem {
     });
   }
 
-  addAlert(level: 'info' | 'warning' | 'critical', message: string, context?: string): void {
-    const alert = {
-      id: Math.random().toString(36).substr(2, 9),
-      level,
+  private addManualAlert(level: 'info' | 'warning' | 'critical', message: string, details?: Record<string, any>): void {
+    const alert: DashboardAlert = {
+      id: Math.random().toString(36).slice(2, 11),
+      severity: level,
       message,
       timestamp: Date.now(),
       acknowledged: false,
-      context
+      details
     };
 
     this.alerts.push(alert);
-
-    // Keep only last 100 alerts
     if (this.alerts.length > 100) {
       this.alerts = this.alerts.slice(-100);
     }
 
-    this.logger[level === 'critical' ? 'error' : level](
-      `Alert: ${message}`,
-      undefined,
-      { alertId: alert.id, context },
-      { component: 'alerts' }
-    );
+    if (level === 'critical') {
+      this.logger.error(`Alert: ${message}`);
+    } else if (level === 'warning') {
+      this.logger.warn(`Alert: ${message}`);
+    } else {
+      this.logger.info(`Alert: ${message}`);
+    }
+  }
+
+  private evaluateAlerts(): void {
+    const context: AlertEvaluationContext = {
+      monitoringStats: this.stats,
+      endpointHealth: Array.from(this.endpointHealth.values()),
+      queueHealth: this.queueHealth,
+      lastAlerts: this.alertManager.getActiveAlerts()
+    };
+
+    const violations = this.alertManager.evaluate(context);
+
+    if (violations.length) {
+      for (const violation of violations) {
+        const alert: DashboardAlert = {
+          id: violation.ruleId,
+          severity: violation.severity,
+          message: violation.message,
+          timestamp: violation.timestamp,
+          acknowledged: false,
+          details: violation.details
+        };
+
+        this.alerts = this.alerts.filter((existing) => existing.id !== alert.id);
+        this.alerts.push(alert);
+      }
+    }
+
+    const activeAlerts = this.alertManager.getActiveAlerts();
+    const merged = new Map<string, DashboardAlert>();
+    for (const alert of this.alerts) {
+      merged.set(alert.id, alert);
+    }
+    for (const active of activeAlerts) {
+      const existing = merged.get(active.ruleId);
+      if (existing) {
+        existing.timestamp = active.timestamp;
+        existing.details = active.details;
+      } else {
+        merged.set(active.ruleId, {
+          id: active.ruleId,
+          severity: active.severity,
+          message: active.message,
+          timestamp: active.timestamp,
+          acknowledged: false,
+          details: active.details
+        });
+      }
+    }
+
+    this.alerts = Array.from(merged.values()).slice(-100);
   }
 
   acknowledgeAlert(alertId: string): void {
@@ -304,7 +493,9 @@ export class MonitoringSystem {
     return {
       realTime: { ...this.realTimeMetrics },
       historical: { ...this.stats },
-      alerts: [...this.alerts]
+      alerts: [...this.alerts],
+      endpointHealth: Array.from(this.endpointHealth.values()),
+      queueHealth: this.queueHealth
     };
   }
 
@@ -335,6 +526,11 @@ export class MonitoringSystem {
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
       this.updateInterval = null;
+    }
+
+    if (this.statsResetInterval) {
+      clearInterval(this.statsResetInterval);
+      this.statsResetInterval = null;
     }
 
     // Save final statistics

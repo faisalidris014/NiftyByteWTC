@@ -144,6 +144,74 @@ export interface MonitoringStats {
   errorDistribution: Record<string, number>;
 }
 
+export type EndpointStatus = 'healthy' | 'degraded' | 'unhealthy' | 'offline';
+
+export interface EndpointHealthStatus {
+  endpointId: string;
+  name: string;
+  status: EndpointStatus;
+  lastHeartbeat: number;
+  details?: string;
+  metrics?: {
+    cpuPercentage?: number;
+    memoryPercentage?: number;
+    pendingTickets?: number;
+  };
+}
+
+export interface QueueHealthStatus {
+  totalItems: number;
+  pending: number;
+  failed: number;
+  retrying: number;
+  oldestItemAge: number;
+  totalSizeBytes: number;
+}
+
+export type AlertSeverity = 'info' | 'warning' | 'critical';
+
+export interface AlertRule {
+  id: string;
+  description: string;
+  severity: AlertSeverity;
+  evaluate(context: AlertEvaluationContext): AlertViolation | null;
+  cooldownMinutes?: number;
+}
+
+export interface AlertEvaluationContext {
+  monitoringStats: MonitoringStats;
+  endpointHealth: EndpointHealthStatus[];
+  queueHealth?: QueueHealthStatus;
+  lastAlerts: AlertViolation[];
+}
+
+export interface AlertViolation {
+  ruleId: string;
+  severity: AlertSeverity;
+  message: string;
+  timestamp: number;
+  details?: Record<string, any>;
+}
+
+export type NotificationChannelType = 'email' | 'slack' | 'teams' | 'webhook';
+
+export interface NotificationChannelConfig {
+  id: string;
+  type: NotificationChannelType;
+  enabled: boolean;
+  target: string;
+  minSeverity: AlertSeverity;
+  headers?: Record<string, string>;
+}
+
+export interface NotificationPayload {
+  severity: AlertSeverity;
+  message: string;
+  timestamp: number;
+  details?: Record<string, any>;
+  channelId: string;
+}
+
 export interface SearchCriteria {
   query?: string;
   filters?: LogFilter;
@@ -159,6 +227,15 @@ export interface SearchResult {
   hasMore: boolean;
 }
 
+export interface DashboardAlert {
+  id: string;
+  severity: AlertSeverity;
+  message: string;
+  timestamp: number;
+  acknowledged: boolean;
+  details?: Record<string, any>;
+}
+
 export interface DashboardMetrics {
   realTime: {
     activeExecutions: number;
@@ -167,11 +244,7 @@ export interface DashboardMetrics {
     recentErrors: number;
   };
   historical: MonitoringStats;
-  alerts: Array<{
-    id: string;
-    level: 'info' | 'warning' | 'critical';
-    message: string;
-    timestamp: number;
-    acknowledged: boolean;
-  }>;
+  alerts: DashboardAlert[];
+  endpointHealth: EndpointHealthStatus[];
+  queueHealth?: QueueHealthStatus;
 }

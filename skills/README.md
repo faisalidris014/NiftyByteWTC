@@ -1,60 +1,36 @@
 # Skills Directory
 
-This directory contains all troubleshooting skills for the Windows Troubleshooting Companion.
+This directory houses the troubleshooting skills packaged with the Windows Troubleshooting Companion. Each skill pairs a metadata file with one or more scripts that the skills engine executes within the sandbox.
 
-## Skill Structure:
+## Current Skills
 
-Each skill consists of:
-- `{skill-id}.json` - Skill metadata and configuration
-- `{skill-id}.ps1` - PowerShell script implementation (for Windows)
-- `{skill-id}.sh` - Shell script implementation (for macOS/Linux)
+| Skill | Description | Script(s) |
+| --- | --- | --- |
+| `wifi-reset` | Enables a disabled Wi-Fi adapter. | `wifi-reset.ps1` |
+| `printer-queue-clear` | Stops the spooler, clears pending jobs, and restarts the service. | `printer-queue-clear.ps1` |
+| `word-file-recovery` | Lists Microsoft Word AutoRecover files without altering data. | `word-file-recovery.ps1` |
+| `app-cache-reset` | Archives and resets Microsoft Teams and Outlook caches. | `app-cache-reset.ps1` |
+| `disk-space` | Collects disk metrics and removes aged files from safe temp locations. | `disk-space.ps1`, `disk-space.sh` |
+| `system-info` | Provides baseline system diagnostics. | `system-info.ps1` |
 
-## Example Skill (Wi-Fi Reset):
+## File Structure
 
-### wifi-reset.json
-```json
-{
-  "id": "wifi-reset",
-  "name": "Wi-Fi Adapter Reset",
-  "description": "Checks if Wi-Fi adapter is disabled and re-enables it",
-  "os": ["windows"],
-  "riskLevel": "medium",
-  "requiresAdmin": true,
-  "script": "wifi-reset.ps1",
-  "version": "1.0.0",
-  "parameters": [],
-  "output": {
-    "success": "Wi-Fi adapter successfully reset",
-    "failure": "Failed to reset Wi-Fi adapter"
-  }
-}
+- `{skill-id}.json` — Metadata following `skill-package-schema.json`.
+- `{skill-id}.ps1` — PowerShell implementation for Windows endpoints.
+- `{skill-id}.sh` — Shell implementation for Unix/macOS endpoints (when applicable).
+
+## Output Convention
+
+Scripts must emit a single line prefixed with `SUCCESS:` or `ERROR:` so the skills engine can parse results reliably. The payload should be compact JSON capturing the relevant context.
+
+## Testing
+
+Acceptance tests for the MVP skills live in `src/__tests__/mvp-skills-acceptance.test.ts`. Run them with:
+
+```bash
+npm test -- mvp-skills-acceptance.test.ts
 ```
 
-### wifi-reset.ps1
-```powershell
-# PowerShell script to reset Wi-Fi adapter
-try {
-    $adapter = Get-NetAdapter -Name "Wi-Fi" -ErrorAction Stop
-    if ($adapter.Status -eq "Disabled") {
-        Enable-NetAdapter -Name "Wi-Fi" -Confirm:$false
-        Write-Output "SUCCESS: Wi-Fi adapter enabled"
-    } else {
-        Write-Output "INFO: Wi-Fi adapter already enabled"
-    }
-} catch {
-    Write-Output "ERROR: $($_.Exception.Message)"
-    exit 1
-}
-```
+## Additional Documentation
 
-## Skill Development Guidelines:
-
-1. **Idempotent**: Skills should be safe to run multiple times
-2. **Error Handling**: Proper error handling and meaningful output
-3. **Security**: No sensitive data in scripts, proper sanitization
-4. **Logging**: Clear success/failure messages for logging
-5. **Performance**: Skills should execute quickly (<30 seconds)
-
-## Deployment:
-
-Skills are packaged with the application and can be toggled via the Admin Console.
+Refer to `docs/mvp-skills-package.md` for a high-level overview, security posture, and maintenance guidance for the MVP skills bundle.

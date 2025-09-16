@@ -18,11 +18,30 @@ export class OfflineQueue {
   private syncInterval?: NodeJS.Timeout;
   private cleanupInterval?: NodeJS.Timeout;
   private isSyncing = false;
+  private monitoringCallback?: (stats: QueueStats) => void;
 
   constructor(config: Partial<QueueConfig> = {}) {
     this.config = { ...DEFAULT_QUEUE_CONFIG, ...config };
     this.db = new EncryptedDatabase(this.config);
     this.startBackgroundTasks();
+  }
+
+  public setMonitoringCallback(callback: (stats: QueueStats) => void): void {
+    this.monitoringCallback = callback;
+    void this.emitQueueStats();
+  }
+
+  private async emitQueueStats(): Promise<void> {
+    if (!this.monitoringCallback) {
+      return;
+    }
+
+    try {
+      const stats = await this.getStats();
+      this.monitoringCallback(stats);
+    } catch (error) {
+      console.error('Queue monitoring callback failed:', (error as Error).message);
+    }
   }
 
   private startBackgroundTasks(): void {
@@ -120,6 +139,7 @@ export class OfflineQueue {
         sizeBytes
       );
 
+      await this.emitQueueStats();
       return id;
     } catch (error) {
       if ((error as Error).message.includes('SQLITE_FULL')) {
@@ -208,6 +228,7 @@ export class OfflineQueue {
     `);
 
     stmt.run(status, now, error, id);
+    await this.emitQueueStats();
   }
 
   public async scheduleRetry(id: string, error: string): Promise<void> {
@@ -234,6 +255,7 @@ export class OfflineQueue {
     `);
 
     stmt.run(now, nextRetryAt, error, id);
+    await this.emitQueueStats();
   }
 
   private calculateBackoff(retryCount: number): number {
@@ -313,6 +335,8 @@ export class OfflineQueue {
       DELETE FROM queue_items
       WHERE status = 'failed' AND created_at < ?
     `).run(monthAgo);
+
+    await this.emitQueueStats();
   }
 
   private async cleanupSpace(requiredSpace: number): Promise<void> {
@@ -345,6 +369,8 @@ export class OfflineQueue {
       database.prepare('DELETE FROM queue_items WHERE id = ?').run(log.id);
       spaceFreed += log.size_bytes;
     }
+
+    await this.emitQueueStats();
   }
 
   public async attemptSync(): Promise<SyncStatus> {
@@ -381,7 +407,7 @@ export class OfflineQueue {
       const duration = Date.now() - startTime;
       await this.recordSyncHistory(duration, itemsSynced, itemsFailed, syncError);
 
-      return {
+      const status = {
         isOnline: itemsSynced > 0 || itemsToSync.length === 0,
         lastSyncTime: startTime,
         lastSyncDuration: duration,
@@ -390,12 +416,13 @@ export class OfflineQueue {
         itemsFailed,
         queueSize: itemsToSync.length
       };
-
+      await this.emitQueueStats();
+      return status;
     } catch (error) {
       const duration = Date.now() - startTime;
       await this.recordSyncHistory(duration, 0, 0, (error as Error).message);
 
-      return {
+      const status = {
         isOnline: false,
         lastSyncTime: startTime,
         lastSyncDuration: duration,
@@ -404,6 +431,8 @@ export class OfflineQueue {
         itemsFailed: 0,
         queueSize: 0
       };
+      await this.emitQueueStats();
+      return status;
     } finally {
       this.isSyncing = false;
     }

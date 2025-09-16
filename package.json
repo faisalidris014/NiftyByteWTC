@@ -13,6 +13,8 @@
     "dev:renderer": "webpack serve --config webpack.dev.js",
     "watch:main": "webpack --config webpack.main.js --watch",
     "dist": "electron-builder --publish=never",
+    "dist:win": "electron-builder --win --x64 --publish=never",
+    "dist:win-msi": "electron-builder --win msi --x64 --publish=never",
     "clean": "rm -rf dist",
     "test": "jest",
     "test:integration": "jest src/itsm-integration/__tests__/integration-api.test.ts",
@@ -31,6 +33,7 @@
   "dependencies": {
     "better-sqlite3": "^9.6.0",
     "crypto-js": "^4.2.0",
+    "electron-updater": "^6.1.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "uuid": "^9.0.1"
@@ -67,15 +70,43 @@
     },
     "files": [
       "src/**/*",
-      "assets/**/*"
+      "assets/**/*",
+      "config/**/*",
+      "build/installer-config.js",
+      "build/rollback.ps1"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "msi",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "publisherName": "NiftyByte"
     },
     "nsis": {
       "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": true,
+      "differentialPackage": true,
+      "silent": true
+    },
+    "msi": {
+      "oneClick": false,
+      "perMachine": true,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://updates.niftybyte.com/wtc",
+        "channel": "stable"
+      }
+    ]
   }
 }
