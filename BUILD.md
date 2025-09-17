@@ -79,6 +79,21 @@ Available MSI properties for silent installation:
 2. **Detection Method**: Use MSI product code for detection
 3. **Dependencies**: Ensure .NET Framework and VC++ redistributables are installed
 
+## Continuous Integration
+
+GitHub Actions (see `.github/workflows/build.yml`) provides the automated pipeline:
+
+1. **Test job (Ubuntu)**
+   - Installs dependencies via `npm ci` with caching.
+   - Runs `npm audit --audit-level=high` for dependency scanning.
+   - Executes `npm run test:coverage -- --watchAll=false` to run the Jest suite and capture coverage.
+   - Runs `npm run test:e2e` (defaults to skipping when Playwright browsers are not available).
+   - Publishes `coverage/lcov.info` as an artifact for later review.
+
+2. **Build job (Windows)** – waits for the test job, then builds and packages the application (`npm run build`, `npm run dist:win-msi`) and uploads the MSI/installer artifacts.
+
+3. **Release job (Windows)** – triggered on tagged commits (`v*`), downloads the installer artifacts and attaches them to a GitHub Release.
+
 ## Code Signing
 
 ### Development (Unsigned)

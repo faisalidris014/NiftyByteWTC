@@ -150,6 +150,11 @@ export class LogManager {
     };
   }
 
+  getQueueHealth() {
+    const metrics = this.monitoringSystem.getDashboardMetrics();
+    return metrics.queueHealth;
+  }
+
   getRecentSecurityEvents(limit: number = 20): any[] {
     // Get recent security events
     return [];

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './AdminConsole.css';
 import { useSecurity } from './SecurityContext';
 import { validateColor, validateNumber, validateThemeConfig } from '../utils/validation';
+import type { FeedbackAnalyticsSummary } from '../types/feedback';
 
 // Types for Admin Console
 interface Skill {
@@ -35,7 +36,7 @@ interface ThemeConfig {
 }
 
 const AdminConsole: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'skills' | 'itsm' | 'health' | 'branding'>('skills');
+  const [activeTab, setActiveTab] = useState<'skills' | 'itsm' | 'health' | 'branding' | 'analytics'>('skills');
   const [skills, setSkills] = useState<Skill[]>([]);
   const [connections, setConnections] = useState<ITSMConnection[]>([]);
   const [theme, setTheme] = useState<ThemeConfig>({
@@ -47,6 +48,9 @@ const AdminConsole: React.FC = () => {
     borderRadius: 8
   });
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [feedbackSummary, setFeedbackSummary] = useState<FeedbackAnalyticsSummary | null>(null);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const { logout, auth } = useSecurity();
 
   // Mock data for demonstration - in real app, this would come from API
@@ -105,6 +109,31 @@ const AdminConsole: React.FC = () => {
       }
     ]);
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'analytics') {
+      return;
+    }
+
+    let cancelled = false;
+    window.electronAPI.getFeedbackSummary()
+      .then((summary) => {
+        if (!cancelled) {
+          setFeedbackSummary(summary);
+          setAnalyticsError(null);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load feedback summary', error);
+        if (!cancelled) {
+          setAnalyticsError('Unable to load analytics at this time.');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
 
   const toggleSkill = (skillId: string) => {
     setSkills(prev => prev.map(skill =>
@@ -180,6 +209,39 @@ const AdminConsole: React.FC = () => {
       }, {} as Record<string, string>)
     );
     return validation.isValid;
+  };
+
+  const handleExportAnalytics = async () => {
+    setIsExporting(true);
+    setAnalyticsError(null);
+    try {
+      const csv = await window.electronAPI.exportFeedbackCsv();
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `wtc-feedback-${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export analytics', error);
+      setAnalyticsError('Export failed. Please try again later.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const refreshAnalytics = async () => {
+    try {
+      const summary = await window.electronAPI.getFeedbackSummary();
+      setFeedbackSummary(summary);
+      setAnalyticsError(null);
+    } catch (error) {
+      console.error('Failed to refresh analytics', error);
+      setAnalyticsError('Unable to refresh analytics right now.');
+    }
   };
 
   const renderSkillsTab = () => (
@@ -435,6 +497,55 @@ const AdminConsole: React.FC = () => {
     </div>
   );
 
+  const renderAnalyticsTab = () => (
+    <div className="admin-section analytics-section">
+      <div className="analytics-header">
+        <h2>Feedback & Analytics</h2>
+        <div className="analytics-actions">
+          <button className="refresh-button" onClick={refreshAnalytics}>
+            Refresh
+          </button>
+          <button className="export-button" onClick={handleExportAnalytics} disabled={isExporting}>
+            {isExporting ? 'Exporting…' : 'Export CSV'}
+          </button>
+        </div>
+      </div>
+
+      {analyticsError && <div className="analytics-error">{analyticsError}</div>}
+
+      <div className="analytics-grid">
+        <div className="analytics-card">
+          <h3>Satisfaction Score</h3>
+          <p className="analytics-value">{feedbackSummary ? `${feedbackSummary.satisfactionScore}%` : '--'}</p>
+          <span className="analytics-detail">Thumbs up: {feedbackSummary?.thumbsUp ?? 0}</span>
+          <span className="analytics-detail">Thumbs down: {feedbackSummary?.thumbsDown ?? 0}</span>
+        </div>
+        <div className="analytics-card">
+          <h3>Resolution Rate</h3>
+          <p className="analytics-value">{feedbackSummary ? `${feedbackSummary.resolutionRate}%` : '--'}</p>
+          <span className="analytics-detail">Average resolution time: {feedbackSummary ? `${Math.round(feedbackSummary.averageResolutionTimeMs)} ms` : '--'}</span>
+        </div>
+        <div className="analytics-card">
+          <h3>MTTR</h3>
+          <p className="analytics-value">{feedbackSummary?.mttrMs ? `${feedbackSummary.mttrMs} ms` : 'n/a'}</p>
+          <span className="analytics-detail">Updated: {feedbackSummary ? new Date(feedbackSummary.updatedAt).toLocaleString() : '--'}</span>
+        </div>
+      </div>
+
+      {feedbackSummary?.queueBacklog && (
+        <div className="queue-summary">
+          <h4>Offline Queue Status</h4>
+          <div className="queue-metrics">
+            <div><strong>Pending:</strong> {feedbackSummary.queueBacklog.pending}</div>
+            <div><strong>Failed:</strong> {feedbackSummary.queueBacklog.failed}</div>
+            <div><strong>Retrying:</strong> {feedbackSummary.queueBacklog.retrying}</div>
+            <div><strong>Oldest Item:</strong> {feedbackSummary.queueBacklog.oldestMinutes} min</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="admin-console">
       <header className="admin-header">
@@ -472,6 +583,12 @@ const AdminConsole: React.FC = () => {
           Health
         </button>
         <button
+          className={activeTab === 'analytics' ? 'nav-button active' : 'nav-button'}
+          onClick={() => setActiveTab('analytics')}
+        >
+          Analytics
+        </button>
+        <button
           className={activeTab === 'branding' ? 'nav-button active' : 'nav-button'}
           onClick={() => setActiveTab('branding')}
         >
@@ -483,6 +600,7 @@ const AdminConsole: React.FC = () => {
         {activeTab === 'skills' && renderSkillsTab()}
         {activeTab === 'itsm' && renderITSMTab()}
         {activeTab === 'health' && renderHealthTab()}
+        {activeTab === 'analytics' && renderAnalyticsTab()}
         {activeTab === 'branding' && renderBrandingTab()}
       </main>
     </div>

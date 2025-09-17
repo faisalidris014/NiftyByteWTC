@@ -5,6 +5,10 @@ import * as path from 'path';
 import { initializeIPCHandlers, registerSkill } from '../ipc/mainHandlers';
 import { initializeAuthHandlers, cleanupAuthHandlers } from '../ipc/adminAuthHandlers';
 import { initializeSecurityIntegration, shutdownSecurityIntegration } from '../security/integration';
+import { OfflineQueue } from '../offline-queue/offline-queue';
+import { LogManager } from '../skills-engine/logging/LogManager';
+import { FeedbackService } from '../analytics/FeedbackService';
+import { registerFeedbackHandlers } from '../ipc/feedbackHandlers';
 
 const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_IS_DEV === 'true';
 
@@ -13,6 +17,9 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 let updateCheckInterval: NodeJS.Timeout | null = null;
+let offlineQueue: OfflineQueue | null = null;
+let feedbackService: FeedbackService | null = null;
+let logManager: LogManager | null = null;
 
 // Application version
 const APP_VERSION = '1.0.0';
@@ -328,6 +335,24 @@ app.whenReady().then(async () => {
   // Initialize authentication handlers
   initializeAuthHandlers();
 
+  // Initialize analytics + queue systems
+  logManager = LogManager.getInstance();
+  offlineQueue = new OfflineQueue();
+  offlineQueue.setMonitoringCallback((stats) => {
+    if (!logManager) return;
+    logManager.updateQueueHealth({
+      totalItems: stats.totalItems,
+      pending: stats.pending,
+      failed: stats.failed,
+      retrying: stats.retrying,
+      oldestItemAge: stats.oldestItemAge,
+      totalSizeBytes: stats.totalSizeBytes
+    });
+  });
+
+  feedbackService = new FeedbackService(offlineQueue, logManager);
+  registerFeedbackHandlers(feedbackService);
+
   // Register sample skills
   registerSampleSkills();
 
@@ -375,6 +400,11 @@ app.on('will-quit', async (event) => {
     clearInterval(updateCheckInterval);
     updateCheckInterval = null;
   }
+
+  if (offlineQueue) {
+    offlineQueue.shutdown();
+    offlineQueue = null;
+  }
   console.log('Application quitting...');
 });
 
@@ -394,10 +424,20 @@ if (!gotTheLock) {
 }
 
 // Hot reload for main process in development
-if (isDev) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require('electron-reload')(__dirname, {
-    electron: require('electron') as unknown as string,
-    hardResetMethod: 'exit',
-  });
+if (isDev && process.env.ELECTRON_ENABLE_RELOAD === '1') {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const reloader = require('electron-reload');
+    const invokeReload = typeof reloader === 'function' ? reloader : reloader.default;
+    const electronBinary = process.platform === 'win32'
+      ? path.join(process.cwd(), 'node_modules', '.bin', 'electron.cmd')
+      : path.join(process.cwd(), 'node_modules', '.bin', 'electron');
+
+    invokeReload(__dirname, {
+      electron: electronBinary,
+      hardResetMethod: 'exit',
+    });
+  } catch (error) {
+    console.warn('electron-reload disabled:', error instanceof Error ? error.message : error);
+  }
 }

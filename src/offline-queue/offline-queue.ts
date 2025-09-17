@@ -563,4 +563,9 @@ export class OfflineQueue {
       );
     }
   }
+
+  public shutdown(): void {
+    this.stopBackgroundTasks();
+    this.db.close();
+  }
 }

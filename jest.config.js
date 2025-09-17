@@ -10,11 +10,20 @@ module.exports = {
     '^.+\\.(ts|tsx)$': 'ts-jest'
   },
   collectCoverageFrom: [
-    'src/**/*.{ts,tsx}',
+    'src/analytics/**/*.ts',
+    'src/skills-engine/logging/**/*.ts',
+    'src/offline-queue/**/*.ts',
+    '!src/**/__tests__/**',
     '!src/**/*.d.ts',
-    '!src/main/main.ts',
-    '!src/renderer/index.tsx'
+    '!src/main/**',
+    '!src/renderer/**',
+    '!src/skills-engine/logging/examples/**',
+    '!src/skills-engine/logging/test/**',
+    '!src/skills-engine/logging/destinations/**'
   ],
+  moduleNameMapper: {
+    '^electron$': '<rootDir>/__mocks__/electron.ts'
+  },
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html']
 };

@@ -100,7 +100,9 @@ The following test scripts have been added to `package.json`:
     "test": "jest",
     "test:integration": "jest src/itsm-integration/__tests__/integration-api.test.ts",
     "test:unit": "jest src/itsm-integration/__tests__/unit.test.ts",
-    "test:end-to-end": "node test-end-to-end.js"
+    "test:end-to-end": "node test-end-to-end.js",
+    "test:coverage": "jest --coverage --runInBand",
+    "test:e2e": "PLAYWRIGHT_SKIP=${PLAYWRIGHT_SKIP:-1} node scripts/run-e2e.js"
   }
 }
 ```
@@ -111,6 +113,8 @@ The following test scripts have been added to `package.json`:
 - **`npm run test:integration`**: Runs only API integration tests with nock mocking
 - **`npm run test:unit`**: Runs unit tests for individual components
 - **`npm run test:end-to-end`**: Runs the standalone end-to-end test script
+- **`npm run test:e2e`**: Executes Playwright-based UI smoke tests (skips automatically when browsers are unavailable)
+- **`npm run test:coverage`**: Generates Jest coverage reports for CI
 
 ## 5. TypeScript Compilation Issues Identified
 

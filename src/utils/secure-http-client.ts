@@ -97,6 +97,23 @@ export interface SecureHttpClientOptions {
   dohResolver?: string;
 }
 
+type NormalizedSecureHttpClientOptions = SecureHttpClientOptions & {
+  minVersion: 'TLSv1.2' | 'TLSv1.3';
+  maxVersion: 'TLSv1.2' | 'TLSv1.3';
+  rejectUnauthorized: boolean;
+  ciphers: string;
+  honorCipherOrder: boolean;
+  timeoutMs: number;
+  maxRedirects: number;
+  userAgent: string;
+  http2: boolean;
+  alpnProtocols: string[];
+  ocspStapling: boolean;
+  enableCertTransparency: boolean;
+  secureDns: boolean;
+  dohResolver: string;
+};
+
 /**
  * HTTP response with security metadata
  */
@@ -158,20 +175,16 @@ export interface SecurityEvent {
  * Secure HTTP Client that enforces TLS 1.3 and security best practices
  */
 export class SecureHttpClient {
-  private options: Required<SecureHttpClientOptions>;
+  private options: NormalizedSecureHttpClientOptions;
   private securityEvents: SecurityEvent[] = [];
   private agent: Agent;
   private requestCounter: number = 0;
 
   constructor(options: SecureHttpClientOptions = {}) {
-    this.options = {
+    const defaults: NormalizedSecureHttpClientOptions = {
       minVersion: 'TLSv1.3',
       maxVersion: 'TLSv1.3',
       rejectUnauthorized: true,
-      ca: undefined,
-      cert: undefined,
-      key: undefined,
-      passphrase: undefined,
       ciphers: 'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305',
       honorCipherOrder: true,
       timeoutMs: 30000,
@@ -182,22 +195,34 @@ export class SecureHttpClient {
       ocspStapling: true,
       enableCertTransparency: true,
       secureDns: true,
-      dohResolver: 'https://cloudflare-dns.com/dns-query',
-      ...options
+      dohResolver: 'https://cloudflare-dns.com/dns-query'
     };
 
-    this.agent = new Agent({
+    this.options = { ...defaults, ...options };
+
+    const agentOptions: ConstructorParameters<typeof Agent>[0] = {
       minVersion: this.options.minVersion,
       maxVersion: this.options.maxVersion,
       rejectUnauthorized: this.options.rejectUnauthorized,
-      ca: this.options.ca,
-      cert: this.options.cert,
-      key: this.options.key,
-      passphrase: this.options.passphrase,
       ciphers: this.options.ciphers,
       honorCipherOrder: this.options.honorCipherOrder,
       timeout: this.options.timeoutMs,
-    });
+    };
+
+    if (this.options.ca) {
+      agentOptions.ca = this.options.ca;
+    }
+    if (this.options.cert) {
+      agentOptions.cert = this.options.cert;
+    }
+    if (this.options.key) {
+      agentOptions.key = this.options.key;
+    }
+    if (this.options.passphrase) {
+      agentOptions.passphrase = this.options.passphrase;
+    }
+
+    this.agent = new Agent(agentOptions);
   }
 
   /**
@@ -232,7 +257,6 @@ export class SecureHttpClient {
     // Configure secure fetch options
     const secureFetchOptions: RequestInit = {
       ...fetchOptions,
-      agent: this.agent,
       headers: {
         'User-Agent': this.options.userAgent,
         'Accept': 'application/json',
@@ -241,6 +265,8 @@ export class SecureHttpClient {
         ...fetchOptions.headers,
       },
     };
+
+    (secureFetchOptions as RequestInit & { dispatcher?: Agent }).dispatcher = this.agent;
 
     // Add security headers
     if (this.options.enableCertTransparency) {
@@ -478,18 +504,30 @@ export class SecureHttpClient {
 
     // Recreate agent with new configuration
     this.agent.destroy();
-    this.agent = new Agent({
+
+    const agentOptions: ConstructorParameters<typeof Agent>[0] = {
       minVersion: this.options.minVersion,
       maxVersion: this.options.maxVersion,
       rejectUnauthorized: this.options.rejectUnauthorized,
-      ca: this.options.ca,
-      cert: this.options.cert,
-      key: this.options.key,
-      passphrase: this.options.passphrase,
       ciphers: this.options.ciphers,
       honorCipherOrder: this.options.honorCipherOrder,
       timeout: this.options.timeoutMs,
-    });
+    };
+
+    if (this.options.ca) {
+      agentOptions.ca = this.options.ca;
+    }
+    if (this.options.cert) {
+      agentOptions.cert = this.options.cert;
+    }
+    if (this.options.key) {
+      agentOptions.key = this.options.key;
+    }
+    if (this.options.passphrase) {
+      agentOptions.passphrase = this.options.passphrase;
+    }
+
+    this.agent = new Agent(agentOptions);
   }
 
   /**

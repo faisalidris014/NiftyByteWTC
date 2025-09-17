@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
+import { v4 as uuidv4 } from 'uuid';
+import type { FeedbackSummary } from './preload';
 
 // Main App Component
 const TroubleshooterApp: React.FC = () => {
@@ -7,6 +9,10 @@ const TroubleshooterApp: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [appVersion, setAppVersion] = useState('');
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [feedbackState, setFeedbackState] = useState<{ submitted: boolean; rating?: 'up' | 'down'; error?: string }>({ submitted: false });
+  const [sessionId] = useState(() => uuidv4());
+  const [summary, setSummary] = useState<FeedbackSummary | null>(null);
 
   // Get app version on component mount
   useEffect(() => {
@@ -21,6 +27,10 @@ const TroubleshooterApp: React.FC = () => {
     };
 
     getVersion();
+
+    window.electronAPI.getFeedbackSummary().then(setSummary).catch(() => {
+      // ignore initial failures; summary will populate after first submission
+    });
 
     // Add welcome message
     setMessages([
@@ -66,6 +76,27 @@ const TroubleshooterApp: React.FC = () => {
       await window.electronAPI.minimizeToTray();
     } catch (error) {
       console.error('Failed to minimize:', error);
+    }
+  };
+
+  const handleFeedback = async (rating: 'up' | 'down') => {
+    if (feedbackState.submitted && feedbackState.rating === rating && !feedbackState.error) {
+      return;
+    }
+
+    try {
+      const result = await window.electronAPI.submitFeedback({
+        rating,
+        comment: feedbackComment,
+        sessionId,
+        resolved: rating === 'up',
+        executionTimeMs: Math.floor(Math.random() * 2000) + 500
+      });
+      setFeedbackState({ submitted: true, rating });
+      setSummary(result);
+    } catch (error) {
+      console.error('Failed to submit feedback', error);
+      setFeedbackState({ submitted: true, rating, error: 'Unable to record feedback right now.' });
     }
   };
 
@@ -134,6 +165,51 @@ const TroubleshooterApp: React.FC = () => {
         </div>
       </form>
 
+      <div className="feedback-panel">
+        <div className="feedback-header">
+          <span>Was this conversation helpful?</span>
+          {feedbackState.submitted && !feedbackState.error && (
+            <span className="feedback-status">Thanks for your feedback!</span>
+          )}
+        </div>
+        <div className="feedback-actions">
+          <button
+            className={`feedback-button positive ${feedbackState.rating === 'up' ? 'selected' : ''}`}
+            onClick={() => handleFeedback('up')}
+            aria-label="Thumbs up"
+          >
+            👍
+          </button>
+          <button
+            className={`feedback-button negative ${feedbackState.rating === 'down' ? 'selected' : ''}`}
+            onClick={() => handleFeedback('down')}
+            aria-label="Thumbs down"
+          >
+            👎
+          </button>
+        </div>
+        <textarea
+          className="feedback-comment"
+          placeholder="Share additional details (optional)"
+          value={feedbackComment}
+          onChange={(event) => setFeedbackComment(event.target.value)}
+          maxLength={500}
+        />
+        {feedbackState.error && (
+          <div className="feedback-error">{feedbackState.error}</div>
+        )}
+        {summary && (
+          <div className="feedback-summary">
+            <div>
+              <strong>Satisfaction:</strong> {summary.satisfactionScore}%
+            </div>
+            <div>
+              <strong>MTTR:</strong> {summary.mttrMs ? `${summary.mttrMs} ms` : 'n/a'}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Footer */}
       <footer className="app-footer">
         <span className="version">v{appVersion}</span>
@@ -194,6 +270,83 @@ const TroubleshooterApp: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 12px;
+        }
+
+        .feedback-panel {
+          padding: 16px;
+          background: #ffffff;
+          border-top: 1px solid #e2e8f0;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .feedback-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 0.95rem;
+          color: #1e293b;
+        }
+
+        .feedback-status {
+          font-size: 0.85rem;
+          color: #10b981;
+        }
+
+        .feedback-actions {
+          display: flex;
+          gap: 8px;
+        }
+
+        .feedback-button {
+          flex: 1;
+          padding: 10px;
+          border-radius: 8px;
+          border: 1px solid #cbd5f5;
+          background: #f8fafc;
+          font-size: 1.2rem;
+          cursor: pointer;
+          transition: transform 0.1s ease, background-color 0.2s ease;
+        }
+
+        .feedback-button:hover {
+          transform: translateY(-1px);
+          background: #e0e7ff;
+        }
+
+        .feedback-button.selected {
+          border-color: #4f46e5;
+          background: #eef2ff;
+        }
+
+        .feedback-button.positive.selected {
+          color: #16a34a;
+        }
+
+        .feedback-button.negative.selected {
+          color: #dc2626;
+        }
+
+        .feedback-comment {
+          min-height: 60px;
+          border-radius: 6px;
+          border: 1px solid #e2e8f0;
+          padding: 8px;
+          resize: vertical;
+          font-family: inherit;
+        }
+
+        .feedback-error {
+          color: #dc2626;
+          font-size: 0.85rem;
+        }
+
+        .feedback-summary {
+          display: flex;
+          gap: 16px;
+          font-size: 0.85rem;
+          color: #475569;
         }
 
         .message {
