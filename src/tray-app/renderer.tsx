@@ -3,6 +3,15 @@ import { createRoot } from 'react-dom/client';
 import { v4 as uuidv4 } from 'uuid';
 import type { FeedbackSummary } from './preload';
 
+type BotStatus = 'ready' | 'queued' | 'responding' | 'offline';
+
+const BOT_STATUS_TEXT: Record<BotStatus, string> = {
+  ready: 'Ready to help',
+  queued: 'Message staged - press send when you are ready.',
+  responding: 'Preparing guidance...',
+  offline: 'Connection lost. We will retry shortly.'
+};
+
 // Main App Component
 const TroubleshooterApp: React.FC = () => {
   const [messages, setMessages] = useState<Array<{text: string, sender: 'user' | 'ai', timestamp: Date}>>([]);
@@ -13,6 +22,7 @@ const TroubleshooterApp: React.FC = () => {
   const [feedbackState, setFeedbackState] = useState<{ submitted: boolean; rating?: 'up' | 'down'; error?: string }>({ submitted: false });
   const [sessionId] = useState(() => uuidv4());
   const [summary, setSummary] = useState<FeedbackSummary | null>(null);
+  const [botStatus, setBotStatus] = useState<BotStatus>('ready');
 
   // Get app version on component mount
   useEffect(() => {
@@ -42,9 +52,22 @@ const TroubleshooterApp: React.FC = () => {
     ]);
   }, []);
 
+  useEffect(() => {
+    if (isLoading) {
+      setBotStatus('responding');
+      return;
+    }
+
+    if (inputText.trim().length > 0) {
+      setBotStatus('queued');
+    } else {
+      setBotStatus('ready');
+    }
+  }, [inputText, isLoading]);
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!inputText.trim() || isLoading) return;
 
     // Add user message
@@ -115,6 +138,11 @@ const TroubleshooterApp: React.FC = () => {
           </button>
         </div>
       </header>
+
+      <section className="bot-status" role="status" aria-live="polite">
+        <span className={`status-dot ${botStatus}`} aria-hidden="true"></span>
+        <span className="bot-status-label">{BOT_STATUS_TEXT[botStatus]}</span>
+      </section>
 
       {/* Chat Messages */}
       <div className="chat-container">
@@ -231,6 +259,46 @@ const TroubleshooterApp: React.FC = () => {
           color: white;
           padding: 12px 16px;
           -webkit-app-region: drag;
+        }
+
+        .bot-status {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 16px;
+          background: #ffffff;
+          border-bottom: 1px solid #e2e8f0;
+          font-size: 12px;
+          color: #475569;
+        }
+
+        .bot-status-label {
+          flex: 1;
+        }
+
+        .status-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          display: inline-flex;
+          background: #10b981;
+          box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
+        }
+
+        .status-dot.queued {
+          background: #f59e0b;
+          box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+        }
+
+        .status-dot.responding {
+          background: #6366f1;
+          box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+          animation: statusPulse 1.4s ease-in-out infinite;
+        }
+
+        .status-dot.offline {
+          background: #ef4444;
+          box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
         }
 
         .header-content {
@@ -412,6 +480,11 @@ const TroubleshooterApp: React.FC = () => {
         @keyframes typing {
           0%, 60%, 100% { transform: scale(1); opacity: 0.4; }
           30% { transform: scale(1.2); opacity: 1; }
+        }
+
+        @keyframes statusPulse {
+          0%, 100% { transform: scale(1); opacity: 0.8; }
+          50% { transform: scale(1.25); opacity: 1; }
         }
 
         .input-area {

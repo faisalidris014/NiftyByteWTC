@@ -3,12 +3,12 @@
 **Assigned Teams:** ai-research, platform-architecture
 
 ## Subtasks:
-- [ ] 14.1 Survey candidate LLM providers with Windows troubleshooting datasets (ai-research)
-- [ ] 14.2 Assess integration capabilities (APIs, tooling, automation hooks) (platform-architecture)
-- [ ] 14.3 Evaluate privacy/compliance, latency, and cost implications (platform-architecture)
-- [ ] 14.4 Document fine-tuning and on-prem deployment options (ai-research)
-- [ ] 14.5 Produce comparison matrix and top 3 recommendation shortlist (ai-research)
-- [ ] 14.6 Outline integration steps and prerequisites for selected models (platform-architecture)
+- [x] 14.1 Survey candidate LLM providers with Windows troubleshooting datasets (ai-research)
+- [x] 14.2 Assess integration capabilities (APIs, tooling, automation hooks) (platform-architecture)
+- [x] 14.3 Evaluate privacy/compliance, latency, and cost implications (platform-architecture)
+- [x] 14.4 Document fine-tuning and on-prem deployment options (ai-research)
+- [x] 14.5 Produce comparison matrix and top 3 recommendation shortlist (ai-research)
+- [x] 14.6 Outline integration steps and prerequisites for selected models (platform-architecture)
 
 ## Research Focus
 - Providers to evaluate: Azure OpenAI, Anthropic Claude, OpenAI GPT-4o, plus any vendor with strong ITSM domain support.

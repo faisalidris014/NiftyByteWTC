@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -20,6 +20,9 @@ let updateCheckInterval: NodeJS.Timeout | null = null;
 let offlineQueue: OfflineQueue | null = null;
 let feedbackService: FeedbackService | null = null;
 let logManager: LogManager | null = null;
+
+const WINDOW_MARGIN_X = 16;
+const WINDOW_MARGIN_Y = 20;
 
 // Application version
 const APP_VERSION = '1.0.0';
@@ -150,7 +153,11 @@ function createWindow(): void {
 
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
-    // Window will be shown when user clicks tray icon
+    dockWindowToTray();
+  });
+
+  mainWindow.on('show', () => {
+    dockWindowToTray();
   });
 
   // Handle window focus events
@@ -161,25 +168,41 @@ function createWindow(): void {
 }
 
 function createTray(): void {
-  // Create tray icon
-  const iconPath = path.join(__dirname, '../../assets/tray-icon.png');
+  const resolveTrayIcon = () => {
+    const candidatePaths = [
+      path.join(__dirname, '../../assets/icon.png'),
+      path.join(__dirname, '../../assets/tray-icon.png')
+    ];
 
-  // Try to load the icon, fallback to empty image if not found
-  let trayIcon;
-  try {
-    trayIcon = nativeImage.createFromPath(iconPath);
-    if (trayIcon.isEmpty()) {
-      throw new Error('Icon is empty');
+    for (const candidate of candidatePaths) {
+      if (!fs.existsSync(candidate)) {
+        continue;
+      }
+
+      const candidateImage = nativeImage.createFromPath(candidate);
+      if (!candidateImage.isEmpty()) {
+        const sized = candidateImage.resize({ width: 18, height: 18 });
+        if (process.platform === 'darwin') {
+          sized.setTemplateImage(true);
+        }
+        return sized;
+      }
     }
-  } catch (error) {
-    console.warn('Tray icon not found, using placeholder:', error instanceof Error ? error.message : String(error));
-    // Create a simple placeholder icon
-    trayIcon = nativeImage.createFromBuffer(Buffer.from(
-      'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAANCSURBVFiFtZdPaBNBFMafbDbZbJqmadrGtGmT1tTWWq1Wq1WrVfGgBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8ePHjw4MGDBw8e', 'base64'
-    ), { width: 16, height: 16 });
-  }
 
-  // Create the tray
+    console.warn('Tray icon asset missing, falling back to placeholder vector.');
+    const fallbackBuffer = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAKUlEQVR4nGNgGAWjYBSMglEwCkbD////R4ZGRkYqGBoYBphGqKjAwICwAAAHyUBn2gIPnFwAAAABJRU5ErkJggg==',
+      'base64'
+    );
+    const fallback = nativeImage.createFromBuffer(fallbackBuffer, { width: 18, height: 18 });
+    if (process.platform === 'darwin') {
+      fallback.setTemplateImage(true);
+    }
+    return fallback;
+  };
+
+  const trayIcon = resolveTrayIcon();
+
   tray = new Tray(trayIcon);
   tray.setToolTip('Windows Troubleshooting Companion');
 
@@ -235,17 +258,55 @@ function toggleMainWindow(): void {
   }
 }
 
+function dockWindowToTray(): void {
+  if (!mainWindow) {
+    return;
+  }
+
+  const windowBounds = mainWindow.getBounds();
+
+  const referencePoint = tray
+    ? {
+        x: Math.round(tray.getBounds().x + tray.getBounds().width / 2),
+        y: Math.round(tray.getBounds().y + tray.getBounds().height / 2)
+      }
+    : screen.getCursorScreenPoint();
+
+  const nearestDisplay = screen.getDisplayNearestPoint(referencePoint);
+  const { workArea } = nearestDisplay;
+
+  const targetX = Math.round(
+    workArea.x + workArea.width - windowBounds.width - WINDOW_MARGIN_X
+  );
+
+  let targetY = Math.round(referencePoint.y - windowBounds.height / 2);
+
+  if (Number.isNaN(targetY)) {
+    targetY = workArea.y + WINDOW_MARGIN_Y;
+  }
+
+  const minY = workArea.y + WINDOW_MARGIN_Y;
+  const maxY = workArea.y + workArea.height - windowBounds.height - WINDOW_MARGIN_Y;
+
+  if (targetY < minY) {
+    targetY = minY;
+  } else if (targetY > maxY) {
+    targetY = maxY;
+  }
+
+  mainWindow.setPosition(targetX, targetY, false);
+}
+
 function showMainWindow(): void {
   if (!mainWindow) {
     createWindow();
   }
 
+  dockWindowToTray();
+
   // Show and focus the window
   mainWindow?.show();
   mainWindow?.focus();
-
-  // Center the window on the screen
-  mainWindow?.center();
 }
 
 function openSettings(): void {
@@ -358,6 +419,18 @@ app.whenReady().then(async () => {
 
   // Configure auto-update channel handling
   initializeAutoUpdater();
+
+  screen.on('display-metrics-changed', () => {
+    dockWindowToTray();
+  });
+
+  screen.on('display-added', () => {
+    dockWindowToTray();
+  });
+
+  screen.on('display-removed', () => {
+    dockWindowToTray();
+  });
 
   // Create tray and window
   createTray();

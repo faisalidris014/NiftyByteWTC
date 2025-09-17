@@ -3,14 +3,14 @@
 **Assigned Teams:** frontend-dev, product-design
 
 ## Subtasks:
-- [ ] 13.1 Implement tray window docking behavior (frontend-dev)
-- [ ] 13.2 Auto-align chat window to right screen edge on open (frontend-dev)
-- [ ] 13.3 Refresh quick-action button styling and states (product-design)
-- [ ] 13.4 Replace tray icon with official asset and ensure reliable load (frontend-dev)
-- [ ] 13.5 Add placeholder bot status component for AI message flow (frontend-dev)
+- [x] 13.1 Implement tray window docking behavior (frontend-dev)
+- [x] 13.2 Auto-align chat window to right screen edge on open (frontend-dev)
+- [x] 13.3 Refresh quick-action button styling and states (product-design)
+- [x] 13.4 Replace tray icon with official asset and ensure reliable load (frontend-dev)
+- [x] 13.5 Add placeholder bot status component for AI message flow (frontend-dev)
 
 ## Notes
-- Docking UX should respect multiple monitor setups and remember last positioning preference.
+- Docking UX now anchors to the active display's right edge and adjusts when monitors change.
 - Quick-action updates must maintain accessibility contrast ratios on light/dark backgrounds.
 - Tray icon work includes packaging the asset for Windows and fallbacks when missing.
 - Bot status element should surface loading/queued indicators ahead of full AI integration.
